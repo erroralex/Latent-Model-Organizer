@@ -1,0 +1,383 @@
+/**
+ * PrimeVue Overrides
+ * Description: Customizing PrimeVue components to match the application's design system.
+ */
+
+/* --- Global Focus & Selection Reset --- */
+*:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.p-focus, .p-highlight {
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* --- Tooltip Theming --- */
+.p-tooltip .p-tooltip-text {
+    background: var(--bg-menu) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-input) !important;
+    backdrop-filter: var(--glass-blur) !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 0.75rem !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+    border-radius: 6px !important;
+}
+
+.p-tooltip-arrow {
+    border-bottom-color: var(--border-input) !important;
+    border-top-color: var(--border-input) !important;
+    border-left-color: var(--border-input) !important;
+    border-right-color: var(--border-input) !important;
+}
+
+/* --- Buttons --- */
+.p-button {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    box-shadow: none !important;
+    position: relative !important;
+    z-index: 1 !important;
+    overflow: visible !important;
+}
+
+.p-button::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: var(--grad-hover);
+    border-radius: 9px;
+    z-index: -2;
+    opacity: 0;
+    filter: blur(4px);
+    transition: opacity 0.3s ease;
+}
+
+.p-button::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    z-index: -1;
+    transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.p-button:enabled:hover {
+    transform: translateY(-1px) !important;
+    color: var(--accent-primary) !important;
+}
+
+.p-button:enabled:hover::before {
+    opacity: 0.8;
+}
+
+.p-button:enabled:hover::after {
+    background: var(--bg-btn-inner);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+.p-button:enabled:hover .p-button-label,
+.p-button:enabled:hover .p-button-icon {
+    background: none !important;
+    -webkit-text-fill-color: var(--accent-primary) !important;
+    color: var(--accent-primary) !important;
+}
+
+.p-button:enabled:active {
+    transform: translateY(0) !important;
+    opacity: 0.9;
+}
+
+.p-button.p-button-text::after {
+    background: transparent;
+    border-color: transparent;
+}
+
+.p-button.p-button-text:enabled:hover::after {
+    background: var(--bg-btn-inner);
+}
+
+/* --- Inputs & Text Fields --- */
+.p-inputtext {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-input) !important;
+    color: var(--text-primary) !important;
+    border-radius: 8px !important;
+    transition: all 0.2s !important;
+}
+
+.p-inputtext:enabled:focus {
+    border-color: var(--accent-primary) !important;
+    box-shadow: var(--shadow-glow-primary) !important;
+}
+
+/* --- Checkbox --- */
+.p-checkbox {
+    width: 20px !important;
+    height: 20px !important;
+}
+
+.p-checkbox .p-checkbox-box {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-input) !important;
+    border-radius: 4px !important;
+    width: 20px !important;
+    height: 20px !important;
+    transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.p-checkbox:not(.p-checkbox-disabled):hover .p-checkbox-box {
+    border-color: var(--accent-primary) !important;
+}
+
+.p-checkbox-checked .p-checkbox-box,
+.p-checkbox .p-checkbox-box.p-highlight,
+.p-checkbox .p-checkbox-box.p-checkbox-checked {
+    background: var(--accent-primary) !important;
+    border-color: var(--accent-primary) !important;
+}
+
+.p-checkbox .p-checkbox-box .p-checkbox-icon {
+    color: var(--bg-app) !important;
+    font-size: 12px !important;
+    font-weight: 900 !important;
+    display: block !important;
+}
+
+/* --- InputSwitch (Toggle) --- */
+.p-inputswitch {
+    width: 3rem !important;
+    height: 1.5rem !important;
+}
+
+.p-inputswitch .p-inputswitch-slider {
+    background-color: var(--bg-input) !important;
+    border: 1px solid var(--border-input) !important;
+    border-radius: 30px !important;
+    transition: background-color 0.2s, border-color 0.2s !important;
+}
+
+.p-inputswitch.p-inputswitch-checked .p-inputswitch-slider {
+    background-color: var(--accent-primary) !important;
+    background: var(--accent-primary) !important;
+    border-color: var(--accent-primary) !important;
+}
+
+.p-inputswitch .p-inputswitch-slider:before {
+    background-color: var(--text-secondary) !important;
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+    left: 0.2rem !important;
+    margin-top: -0.55rem !important;
+    border-radius: 50% !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.p-inputswitch.p-inputswitch-checked .p-inputswitch-slider:before {
+    background-color: var(--bg-app) !important;
+    transform: translateX(1.5rem) !important;
+}
+
+/* --- Cards & Panels --- */
+.surface-card {
+    background: var(--bg-card) !important;
+    border: var(--border-glass) !important;
+    backdrop-filter: blur(16px) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.8) !important;
+}
+
+.surface-card.cursor-pointer:hover {
+    border-color: rgba(255, 255, 255, 0.3) !important;
+    background: rgba(40, 40, 40, 0.7) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.9) !important;
+}
+
+/* --- Tree & Navigation --- */
+.p-treenode-content {
+    border-radius: 6px !important;
+    transition: background 0.2s !important;
+    color: var(--text-secondary) !important;
+}
+
+.p-treenode-content:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: white !important;
+}
+
+.p-treenode-content.p-highlight {
+    background: rgba(102, 252, 241, 0.1) !important;
+    color: var(--accent-primary) !important;
+    border-left: 2px solid var(--accent-primary) !important;
+}
+
+/* --- Overlays & Menus --- */
+.p-sidebar {
+    background: rgba(0, 0, 0, 0.9) !important;
+    backdrop-filter: blur(20px) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: -10px 0 30px rgba(0,0,0,1.0) !important;
+}
+
+.p-contextmenu {
+    background: rgba(10, 10, 10, 0.95) !important;
+    backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.9) !important;
+}
+
+.p-contextmenu .p-menuitem-link {
+    transition: all 0.1s;
+}
+
+.p-contextmenu .p-menuitem-link:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.p-contextmenu .p-menuitem-link:hover .p-menuitem-text,
+.p-contextmenu .p-menuitem-link:hover .p-menuitem-icon {
+    color: white !important;
+}
+
+/* --- Sliders --- */
+html body .p-slider {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-input) !important;
+    border-radius: 4px !important;
+}
+
+html body .p-slider .p-slider-range {
+    background: var(--accent-primary) !important;
+    background-image: var(--grad-hover) !important;
+}
+
+html body .p-slider .p-slider-handle,
+html body .p-slider:not(.p-disabled) .p-slider-handle {
+    background: var(--accent-primary) !important;
+    background-color: var(--accent-primary) !important;
+    background-image: none !important;
+    border: 2px solid var(--accent-primary) !important;
+    border-radius: 50% !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+    outline: none !important;
+}
+
+html body .p-slider .p-slider-handle::before,
+html body .p-slider .p-slider-handle::after,
+html body .p-slider:not(.p-disabled) .p-slider-handle::before,
+html body .p-slider:not(.p-disabled) .p-slider-handle::after {
+    display: none !important;
+    background: none !important;
+    box-shadow: none !important;
+}
+
+html body .p-slider .p-slider-handle:hover,
+html body .p-slider:not(.p-disabled) .p-slider-handle:hover {
+    background: var(--accent-secondary) !important;
+    background-color: var(--accent-secondary) !important;
+    border-color: var(--accent-secondary) !important;
+    transform: scale(1.1) !important;
+    box-shadow: var(--shadow-glow-primary) !important;
+}
+
+/* --- Progress Bar --- */
+.p-progressbar {
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-input) !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+}
+
+.p-progressbar .p-progressbar-value {
+    background: var(--grad-hover) !important;
+    border-radius: 10px !important;
+}
+
+/* --- Dropdowns & Selects --- */
+.p-dropdown-panel, .p-menu, .p-multiselect-panel {
+    background: var(--bg-menu) !important;
+    border: 1px solid var(--border-input) !important;
+    color: var(--text-primary) !important;
+}
+
+.p-dropdown-item, .p-menuitem-link, .p-multiselect-item {
+    color: var(--text-primary) !important;
+}
+
+.p-dropdown-item .p-dropdown-item-label,
+.p-menuitem-link .p-menuitem-text,
+.p-menuitem-link .p-menuitem-icon,
+.p-multiselect-item .p-multiselect-item-label {
+    color: var(--text-primary) !important;
+}
+
+.p-dropdown-item:hover, .p-menuitem-link:hover, .p-multiselect-item:hover {
+    background: var(--bg-input) !important;
+    color: var(--text-primary) !important;
+}
+
+.p-dropdown-item.p-highlight {
+    background: var(--grad-hover) !important;
+    color: #fff !important;
+}
+
+.p-dropdown-item.p-highlight .p-dropdown-item-label {
+    color: #fff !important;
+}
+
+.p-dropdown:not(.p-disabled).p-focus {
+    box-shadow: var(--shadow-glow-primary) !important;
+    border-color: var(--accent-primary) !important;
+    outline: 0 none !important;
+}
+
+.p-dropdown-panel .p-dropdown-items-wrapper,
+.p-multiselect-panel .p-multiselect-items-wrapper {
+    max-height: 40vh !important;
+    overflow-y: auto !important;
+}
+
+.p-dropdown-panel .p-dropdown-items-wrapper::-webkit-scrollbar,
+.p-multiselect-panel .p-multiselect-items-wrapper::-webkit-scrollbar {
+    width: 8px;
+}
+
+.p-dropdown-panel .p-dropdown-items-wrapper::-webkit-scrollbar-track,
+.p-multiselect-panel .p-multiselect-items-wrapper::-webkit-scrollbar-track {
+    background: var(--scrollbar-track, var(--bg-input));
+    border-radius: 4px;
+}
+
+.p-dropdown-panel .p-dropdown-items-wrapper::-webkit-scrollbar-thumb,
+.p-multiselect-panel .p-multiselect-items-wrapper::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb, var(--border-input));
+    border-radius: 4px;
+}
+
+.p-dropdown-panel .p-dropdown-items-wrapper::-webkit-scrollbar-thumb:hover,
+.p-multiselect-panel .p-multiselect-items-wrapper::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover, var(--accent-primary));
+}
+
+/* --- MultiSelect Specific Fix --- */
+.p-multiselect-item.p-highlight,
+.p-multiselect-item[aria-selected="true"] {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.p-multiselect-item.p-highlight .p-checkbox .p-checkbox-box,
+.p-multiselect-item[aria-selected="true"] .p-checkbox .p-checkbox-box {
+    background: var(--accent-primary) !important;
+    border-color: var(--accent-primary) !important;
+}

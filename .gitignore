@@ -1,0 +1,52 @@
+# =========================
+# System / OS
+# =========================
+.DS_Store
+Thumbs.db
+*.log
+
+# =========================
+# IntelliJ IDEA
+# =========================
+.idea/
+*.iml
+*.iws
+out/
+
+# =========================
+# Backend (Java / Maven)
+# =========================
+backend/target/
+backend/.mvn/
+!backend/.mvn/wrapper/maven-wrapper.jar
+!backend/.mvn/wrapper/maven-wrapper.properties
+backend/*mvnw*
+*.jar
+*.war
+*.ear
+
+# =========================
+# Frontend (Vue / Vite)
+# =========================
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+frontend/.eslintcache
+
+# =========================
+# Electron
+# =========================
+electron/node_modules/
+electron/dist/
+electron/out/
+electron/release/
+
+# =========================
+# Node / npm
+# =========================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json

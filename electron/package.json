@@ -1,0 +1,16 @@
+{
+  "name": "latent-model-organizer-desktop",
+  "version": "1.0.0",
+  "description": "Desktop wrapper for Latent Model Organizer",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^41.0.0"
+  }
+}

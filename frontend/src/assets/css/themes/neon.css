@@ -1,0 +1,60 @@
+/**
+ * Theme: Deep Neon Cinematic
+ * Description: High-contrast dark theme with cyan and purple neon accents.
+ */
+
+:root, .theme-neon {
+    /* --- Main Backgrounds --- */
+    --bg-app: #000000;
+    --bg-app-image: radial-gradient(circle at 15% 25%, rgba(102, 252, 241, 0.08) 0%, transparent 40%),
+                    radial-gradient(circle at 85% 75%, rgba(216, 112, 255, 0.08) 0%, transparent 40%);
+
+    /* --- Component Backgrounds --- */
+    --bg-header: rgba(0, 0, 0, 0.80);
+    --bg-sidebar-left: rgba(0, 0, 0, 0.75);
+    --bg-sidebar-right: rgba(0, 0, 0, 0.45);
+    --bg-toolbar: rgba(0, 0, 0, 0.80);
+    --bg-filmstrip: rgba(0, 0, 0, 0.75);
+
+    /* --- Generic Panels --- */
+    --bg-panel: rgba(0, 0, 0, 0.75);
+    --bg-panel-opaque: rgba(10, 10, 10, 0.95);
+    --bg-input: rgba(0, 0, 0, 0.85);
+    --bg-overlay: rgba(0, 0, 0, 0.75);
+    --bg-menu: rgba(10, 10, 10, 0.95);
+
+    /* --- Button Internals --- */
+    --bg-btn-inner: #000000;
+
+    /* --- Borders --- */
+    --border-light: rgba(255, 255, 255, 0.08);
+    --border-input: rgba(255, 255, 255, 0.1);
+
+    /* --- Text --- */
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0a0;
+    --text-muted: #666666;
+
+    /* --- Accents & Gradients --- */
+    --accent-primary: #66fcf1;
+    --accent-secondary: #d870ff;
+    --grad-text: linear-gradient(90deg, #66fcf1, #d870ff);
+    --grad-hover: linear-gradient(135deg, #66fcf1 0%, #d870ff 100%);
+    --grad-border: linear-gradient(135deg, rgba(102, 252, 241, 0.8) 0%, rgba(216, 112, 255, 0.8) 100%);
+
+    /* --- Status Colors --- */
+    --status-danger: #ff4d4d;
+    --status-warning: #eab308;
+    --status-success: #22c55e;
+
+    /* --- Effects --- */
+    --glass-blur: blur(20px);
+    --shadow-panel: 0 10px 40px -10px rgba(0, 0, 0, 1.0), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --shadow-glow-primary: 0 0 10px rgba(102, 252, 241, 0.1);
+    --shadow-glow-secondary: 0 0 20px rgba(216, 112, 255, 0.25);
+
+    /* --- Scrollbars --- */
+    --scrollbar-track: rgba(255, 255, 255, 0.02);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+}
