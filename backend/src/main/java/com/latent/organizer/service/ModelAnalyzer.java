@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.latent.organizer.domain.ModelMetadata;
 import com.latent.organizer.exception.OrganizerException;
+import com.latent.organizer.util.HashUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,53 +19,65 @@ import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 
 /**
- * Service responsible for analyzing model files to determine their neural network architecture.
- * <p>
- * This analyzer supports two detection methods:
+ * <p>Advanced model analysis engine for identifying neural network architectures and metadata.</p>
+ *
+ * <p>The {@code ModelAnalyzer} employs a multi-tiered heuristic approach to identify models,
+ * prioritizing performance and local privacy before falling back to network-based lookups.
+ * The analysis pipeline consists of the following stages:
  * <ol>
- *     <li>Reading a sidecar `.civitai.info` JSON file.</li>
- *     <li>Parsing the header of a `.safetensors` file directly (memory-efficient).</li>
+ *     <li><b>Sidecar Inspection:</b> Checks for existing {@code .civitai.info} files which provide
+ *     authoritative metadata without additional computation.</li>
+ *     <li><b>Header Parsing:</b> Directly reads the JSON header of {@code .safetensors} files using
+ *     memory-mapped I/O (FileChannel). This is extremely efficient as it only reads the first
+ *     few kilobytes of multi-gigabyte files.</li>
+ *     <li><b>API Fallback:</b> Computes a SHA-256 hash of the model and queries the Civitai API.
+ *     Upon a successful match, it persists the metadata locally for future use and downloads
+ *     available preview images.</li>
  * </ol>
+ * </p>
+ *
+ * <p>The analyzer includes a sophisticated mapping logic to categorize raw metadata strings into
+ * clean architectural buckets like "SDXL", "Flux", "Pony", and "Illustrious".</p>
  */
 public class ModelAnalyzer {
 
     private static final Logger logger = LoggerFactory.getLogger(ModelAnalyzer.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private final CivitaiApiClient civitaiApiClient;
 
-    /**
-     * Analyzes the given model file to extract metadata and determine its architecture.
-     *
-     * @param modelPath The path to the main model file (e.g., .safetensors).
-     * @return A {@link ModelMetadata} object containing the detected architecture and base model.
-     * @throws OrganizerException if the file cannot be read or analyzed.
-     */
+    public ModelAnalyzer() {
+        this(new CivitaiApiClient());
+    }
+
+    public ModelAnalyzer(CivitaiApiClient civitaiApiClient) {
+        this.civitaiApiClient = civitaiApiClient;
+    }
+
     public ModelMetadata analyze(Path modelPath) {
         String fileName = modelPath.getFileName().toString();
-        
+
         try {
-            // Method 1: Check for sidecar .civitai.info file
             Optional<ModelMetadata> sidecarMetadata = analyzeSidecar(modelPath);
             if (sidecarMetadata.isPresent()) {
                 return sidecarMetadata.get();
             }
 
-            // Method 2: Analyze .safetensors header
+            ModelMetadata headerMetadata = null;
             if (fileName.endsWith(".safetensors")) {
-                return analyzeSafetensorsHeader(modelPath);
+                headerMetadata = analyzeSafetensorsHeader(modelPath);
+                if (!"Unknown".equals(headerMetadata.architecture())) {
+                    return headerMetadata;
+                }
             }
 
-            // Fallback for unknown types
-            logger.warn("Could not determine architecture for file: {}", fileName);
-            return new ModelMetadata(fileName, "Unknown", "Unknown");
+            logger.info("Local analysis failed for '{}'. Attempting Civitai API lookup...", fileName);
+            return analyzeViaCivitai(modelPath);
 
         } catch (IOException e) {
             throw new OrganizerException("Failed to analyze model: " + fileName, e);
         }
     }
 
-    /**
-     * Attempts to find and parse a corresponding .civitai.info file.
-     */
     private Optional<ModelMetadata> analyzeSidecar(Path modelPath) throws IOException {
         String fileName = modelPath.getFileName().toString();
         String baseName = fileName.substring(0, fileName.lastIndexOf('.'));
@@ -73,7 +86,7 @@ public class ModelAnalyzer {
         if (Files.exists(sidecarPath)) {
             logger.debug("Found sidecar file: {}", sidecarPath);
             JsonNode rootNode = objectMapper.readTree(sidecarPath.toFile());
-            
+
             if (rootNode.has("baseModel")) {
                 String baseModel = rootNode.get("baseModel").asText();
                 String architecture = mapBaseModelToArchitecture(baseModel);
@@ -83,43 +96,32 @@ public class ModelAnalyzer {
         return Optional.empty();
     }
 
-    /**
-     * Reads the .safetensors header efficiently without loading the full file.
-     * <p>
-     * .safetensors format:
-     * 8 bytes (u64 le) - length of the JSON header
-     * N bytes          - JSON header data
-     * ...              - Tensor data
-     */
     private ModelMetadata analyzeSafetensorsHeader(Path modelPath) throws IOException {
         try (FileChannel channel = FileChannel.open(modelPath, StandardOpenOption.READ)) {
-            // 1. Read the 8-byte header length prefix
             ByteBuffer lengthBuffer = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN);
             int bytesRead = channel.read(lengthBuffer);
-            
+
             if (bytesRead != 8) {
-                throw new OrganizerException("Invalid safetensors file: insufficient header length bytes");
+                logger.warn("Invalid safetensors file header: insufficient bytes");
+                return new ModelMetadata(modelPath.getFileName().toString(), "Unknown", "Unknown");
             }
-            
+
             lengthBuffer.flip();
             long headerLength = lengthBuffer.getLong();
-            
-            if (headerLength <= 0 || headerLength > 100_000_000) { // Safety cap (100MB header is huge)
+
+            if (headerLength <= 0 || headerLength > 100_000_000) {
                 throw new OrganizerException("Invalid safetensors header length: " + headerLength);
             }
 
-            // 2. Read the JSON header content
             ByteBuffer headerBuffer = ByteBuffer.allocate((int) headerLength);
             channel.read(headerBuffer);
             headerBuffer.flip();
-            
+
             String jsonHeader = new String(headerBuffer.array(), StandardCharsets.UTF_8);
             JsonNode metadataNode = objectMapper.readTree(jsonHeader);
-            
-            // 3. Extract metadata
+
             String baseModel = "Unknown";
-            
-            // Check for standard metadata keys
+
             if (metadataNode.has("__metadata__")) {
                 JsonNode internalMeta = metadataNode.get("__metadata__");
                 if (internalMeta.has("ss_sd_model_name")) {
@@ -127,35 +129,86 @@ public class ModelAnalyzer {
                 } else if (internalMeta.has("modelspec.title")) {
                     baseModel = internalMeta.get("modelspec.title").asText();
                 } else if (internalMeta.has("ss_base_model_version")) {
-                     baseModel = internalMeta.get("ss_base_model_version").asText();
+                    baseModel = internalMeta.get("ss_base_model_version").asText();
                 }
             }
 
             String architecture = mapBaseModelToArchitecture(baseModel);
             return new ModelMetadata(modelPath.getFileName().toString(), architecture, baseModel);
+        } catch (Exception e) {
+            logger.warn("Safetensors header parsing failed: {}", e.getMessage());
+            return new ModelMetadata(modelPath.getFileName().toString(), "Unknown", "Unknown");
         }
     }
 
-    /**
-     * Maps a raw base model string to a simplified architecture category.
-     */
+    private ModelMetadata analyzeViaCivitai(Path modelPath) {
+        String fileName = modelPath.getFileName().toString();
+        try {
+            String hash = HashUtil.calculateSHA256(modelPath);
+
+            String jsonResponse = civitaiApiClient.fetchMetadataByHash(hash);
+
+            if (jsonResponse != null) {
+                JsonNode rootNode = objectMapper.readTree(jsonResponse);
+
+                if (rootNode.has("baseModel")) {
+                    String baseModel = rootNode.get("baseModel").asText();
+                    String architecture = mapBaseModelToArchitecture(baseModel);
+
+                    String baseName = fileName.substring(0, fileName.lastIndexOf('.'));
+                    Path sidecarPath = modelPath.resolveSibling(baseName + ".civitai.info");
+                    Files.writeString(sidecarPath, jsonResponse, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+                    logger.info("Cached metadata for '{}' to '{}'", fileName, sidecarPath);
+
+                    if (rootNode.has("images") && rootNode.get("images").isArray() && !rootNode.get("images").isEmpty()) {
+                        String imageUrl = rootNode.get("images").get(0).get("url").asText();
+
+                        String extension = ".preview.png";
+                        String lowerUrl = imageUrl.toLowerCase();
+                        if (lowerUrl.endsWith(".jpg") || lowerUrl.endsWith(".jpeg")) extension = ".preview.jpeg";
+                        else if (lowerUrl.endsWith(".webp")) extension = ".preview.webp";
+
+                        Path imagePath = modelPath.resolveSibling(baseName + extension);
+
+                        if (!Files.exists(imagePath)) {
+                            civitaiApiClient.downloadPreviewImage(imageUrl, imagePath);
+                        }
+                    }
+
+                    return new ModelMetadata(fileName, architecture, baseModel);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Civitai API fallback failed for '{}': {}", fileName, e.getMessage());
+        }
+
+        return new ModelMetadata(fileName, "Unknown", "Unknown");
+    }
+
     private String mapBaseModelToArchitecture(String baseModel) {
         if (baseModel == null) return "Unknown";
-        
-        String lower = baseModel.toLowerCase();
-        
-        if (lower.contains("sdxl") || lower.contains("stable diffusion xl")) {
-            return "SDXL";
-        } else if (lower.contains("pony")) {
-            return "Pony"; // Pony is often based on SDXL but users prefer separate folders
-        } else if (lower.contains("flux")) {
-            return "Flux";
-        } else if (lower.contains("sd 1.5") || lower.contains("v1-5") || lower.contains("1.5")) {
-            return "SD1.5";
-        } else if (lower.contains("sd 2.1") || lower.contains("v2-1")) {
-            return "SD2.1";
-        } else {
-            return "Other";
+
+        String upper = baseModel.toUpperCase();
+
+        if (upper.contains("PONY")) return "Pony";
+        if (upper.contains("ILLUSTRIOUS")) return "Illustrious";
+        if (upper.contains("SANA")) return "Sana";
+        if (upper.contains("NOOB")) return "Noob V";
+        if (upper.contains("FLUX")) return "Flux";
+
+        if (upper.contains("SD3.5") || upper.contains("SD 3.5") || upper.contains("SD3") || upper.contains("SD 3")) {
+            return "SD 3.5";
         }
+
+        if (upper.contains("SDXL")) return "SDXL";
+
+        if (upper.contains("V1-5") || upper.contains("SD1.5") || upper.contains("SD 1.5") || upper.contains("SD15")) {
+            return "SD 1.5";
+        }
+        if (upper.contains("V1-4") || upper.contains("SD1.4") || upper.contains("SD 1.4") || upper.contains("SD14")) {
+            return "SD 1.4";
+        }
+
+        return "Unknown";
     }
 }
