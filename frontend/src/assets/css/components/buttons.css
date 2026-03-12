@@ -1,9 +1,13 @@
 /**
  * Button Styles
- * Description: Navigation, action, and specialized window control buttons.
+ * Base reset + legacy components not covered by Lmo_buttons.css.
+ *
+ * Removed from this file (now in Lmo_buttons.css to avoid cascade conflicts):
+ *   .nav-btn, .active-nav-btn, .window-close-btn,
+ *   .primary-btn, .secondary-btn, .link-btn, .glass-input
  */
 
-/* --- Base Button Styles --- */
+/* --- Base Button Reset --- */
 button {
     padding: 10px 15px;
     border: 1px solid transparent;
@@ -20,6 +24,7 @@ button:disabled {
 }
 
 /* --- Tab Navigation Buttons (Segmented Control) --- */
+/* Used in the old pill-style tabs inside cards, not the header nav. */
 .tab-btn {
     flex: 1;
     padding: 8px;
@@ -42,173 +47,6 @@ button:disabled {
 .tab-btn:hover:not(.active):not(:disabled) {
     color: var(--text-primary);
     background: rgba(255,255,255,0.05);
-}
-
-/* --- Navigation Buttons --- */
-.nav-btn {
-    color: var(--text-secondary) !important;
-    border-radius: 8px;
-    position: relative !important;
-    z-index: 1 !important;
-    background: transparent !important;
-    overflow: visible !important;
-    border: 1px solid transparent;
-    margin: 4px !important;
-}
-
-.nav-btn::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    background: var(--grad-hover);
-    border-radius: 9px;
-    z-index: -2;
-    opacity: 0;
-    filter: blur(4px);
-    transition: opacity 0.3s ease;
-}
-
-.nav-btn::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: transparent;
-    border-radius: 8px;
-    z-index: -1;
-    transition: background 0.3s ease;
-}
-
-.nav-btn:hover {
-    color: var(--text-primary) !important;
-    transform: translateY(-1px);
-}
-
-.nav-btn:hover::before {
-    opacity: 0.8;
-}
-
-.nav-btn:hover::after {
-    background: var(--bg-btn-inner);
-}
-
-/* --- Active Navigation State --- */
-.nav-btn.active-nav-btn {
-    color: transparent !important;
-}
-
-.nav-btn.active-nav-btn::before {
-    opacity: 0.8;
-}
-
-.nav-btn.active-nav-btn::after {
-    background: var(--bg-btn-inner);
-}
-
-.nav-btn.active-nav-btn .p-button-label,
-.nav-btn.active-nav-btn .p-button-icon {
-    background: var(--grad-text);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    color: transparent !important;
-    font-weight: 700;
-}
-
-/* --- Action Buttons --- */
-.primary-btn {
-    width: 100%;
-    background: var(--accent-primary);
-    color: #000;
-    margin-top: 10px;
-    font-size: 1.1em;
-    border: none;
-}
-
-.primary-btn:hover:not(:disabled) {
-    filter: brightness(1.1);
-    box-shadow: 0 0 15px var(--accent-primary);
-}
-
-.secondary-btn {
-    background: var(--bg-btn-inner);
-    border: 1px solid var(--border-light);
-}
-
-.secondary-btn:hover:not(:disabled) {
-    border-color: var(--accent-primary);
-    color: var(--accent-primary);
-}
-
-/* --- Link Buttons --- */
-.link-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--accent-primary);
-    font-size: 0.78rem;
-    padding: 0.1rem 0.2rem;
-    opacity: 0.85;
-    transition: opacity 0.15s;
-    font-weight: bold;
-}
-
-.link-btn:hover:not(:disabled) {
-    opacity: 1;
-    text-decoration: underline;
-}
-
-.link-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
-}
-
-/* --- Window Control Buttons --- */
-.window-close-btn {
-    position: relative !important;
-    z-index: 1 !important;
-    background: transparent !important;
-    overflow: visible !important;
-}
-
-.window-close-btn::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    background: var(--status-danger);
-    border-radius: 9px;
-    z-index: -2;
-    opacity: 0;
-    filter: blur(4px);
-    transition: opacity 0.3s ease;
-}
-
-.window-close-btn::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: transparent;
-    border-radius: 8px;
-    z-index: -1;
-    transition: background 0.3s ease;
-}
-
-.window-close-btn:hover {
-    color: var(--text-primary) !important;
-    transform: translateY(-1px);
-    box-shadow: none !important;
-    background: transparent !important;
-}
-
-.window-close-btn:hover::before {
-    opacity: 0.8;
-}
-
-.window-close-btn:hover::after {
-    background: var(--bg-btn-inner);
-}
-
-.window-close-btn:hover .p-button-icon {
-    color: var(--text-primary) !important;
 }
 
 /* --- Console Control Buttons --- */

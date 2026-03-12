@@ -3,6 +3,7 @@ package com.latent.organizer.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.latent.organizer.domain.ModelMetadata;
+import com.latent.organizer.domain.OperationReport;
 import com.latent.organizer.exception.OrganizerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,8 +14,14 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -25,7 +32,7 @@ import java.util.stream.Stream;
  * naming conventions. The service uses a combination of prefix matching and common-root analysis
  * to ensure related files are never orphaned during the movement process.</p>
  *
- * <p>Operational characteristics:
+ * <p>Engineering considerations:
  * <ul>
  *     <li><b>Prefix-Matching Engine:</b> Anchors groups on discovered {@code .safetensors} files,
  *     using defensive longest-stem sorting to prevent overlapping group collisions.</li>
@@ -35,6 +42,8 @@ import java.util.stream.Stream;
  *     to Java 21's Virtual Threads, maintaining high throughput without blocking system resources.</li>
  *     <li><b>Atomic Movements:</b> Ensures file integrity by using atomic move operations where supported
  *     by the underlying file system.</li>
+ *     <li><b>Dry Run Capability:</b> Supports non-destructive simulation modes for testing configuration
+ *     changes before actual file system modification.</li>
  * </ul>
  * </p>
  */
@@ -43,6 +52,7 @@ public class OrganizationService {
     private static final Logger logger = LoggerFactory.getLogger(OrganizationService.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final String UNCATEGORIZED = "Uncategorized";
+    private static final int MAX_SCAN_DEPTH = 4;
 
     private final ModelAnalyzer modelAnalyzer;
     private final CivitaiApiClient civitaiApiClient;
@@ -52,51 +62,99 @@ public class OrganizationService {
         this.civitaiApiClient = new CivitaiApiClient();
     }
 
-    public void organizeModels(Path sourceDir, Path targetDir, List<String> allowedArchitectures) {
-        logger.info("Starting organization task. Source: {}, Target: {}", sourceDir, targetDir);
-
+    public OperationReport organizeModels(Path sourceDir, Path targetDir, List<String> allowedArchitectures, boolean isRecursive, boolean isDryRun) {
+        logger.info("Starting organization task. Recursive: {}, Dry Run: {}", isRecursive, isDryRun);
         Set<String> allowedSet = buildAllowedSet(allowedArchitectures);
 
-        List<Path> allFiles;
-        try (Stream<Path> walk = Files.walk(sourceDir)) {
-            allFiles = walk
+        ConcurrentHashMap<String, AtomicInteger> stats = new ConcurrentHashMap<>();
+        CopyOnWriteArrayList<String> errors = new CopyOnWriteArrayList<>();
+
+        try (Stream<Path> fileStream = isRecursive ? Files.walk(sourceDir, MAX_SCAN_DEPTH) : Files.list(sourceDir)) {
+            List<Path> allFiles = fileStream
                     .filter(Files::isRegularFile)
                     .filter(p -> !isAlreadyOrganized(p, targetDir))
                     .toList();
+
+            int totalFiles = allFiles.size();
+            logger.info("Found {} candidate files.", totalFiles);
+
+            Map<String, List<Path>> groupedFiles = groupByPrefix(allFiles);
+            logger.info("Identified {} model groups via prefix matching.", groupedFiles.size());
+
+            List<Future<?>> futures = new ArrayList<>();
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                for (Map.Entry<String, List<Path>> entry : groupedFiles.entrySet()) {
+                    futures.add(executor.submit(() -> processGroup(entry.getKey(), entry.getValue(), targetDir, allowedSet, isDryRun, stats, errors)));
+                }
+            }
+            
+            for (Future<?> f : futures) {
+                try { f.get(); } catch (ExecutionException e) {
+                    logger.error("Task failed unexpectedly: {}", e.getCause().getMessage(), e.getCause());
+                    errors.add("Task failure: " + e.getCause().getMessage());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+
+            logger.info("Organization task completed.");
+
+            Map<String, Integer> finalStats = stats.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
+
+            int totalProcessed = finalStats.values().stream().mapToInt(Integer::intValue).sum();
+            int totalUncategorized = finalStats.getOrDefault(UNCATEGORIZED, 0);
+
+            return new OperationReport("Organization completed successfully.", finalStats, new ArrayList<>(errors), totalProcessed, totalUncategorized);
+
         } catch (IOException e) {
             throw new OrganizerException("Failed to read source directory: " + sourceDir, e);
         }
-
-        logger.info("Found {} candidate files after recursive scan.", allFiles.size());
-
-        Map<String, List<Path>> groupedFiles = groupByPrefix(allFiles);
-        logger.info("Identified {} model groups via prefix matching.", groupedFiles.size());
-
-        runConcurrently(groupedFiles.entrySet(), entry ->
-                processGroup(entry.getKey(), entry.getValue(), targetDir, allowedSet));
-
-        logger.info("Organization task completed.");
     }
 
-    public void fetchMissingMetadata(Path targetDir) {
-        logger.info("Starting metadata fetch scan in: {}", targetDir);
+    public OperationReport fetchMissingMetadata(Path targetDir, boolean isRecursive, boolean isDryRun) {
+        logger.info("Starting metadata fetch scan. Recursive: {}, Dry Run: {}", isRecursive, isDryRun);
 
-        List<Path> modelsToProcess;
-        try (Stream<Path> fileStream = Files.walk(targetDir)) {
-            modelsToProcess = fileStream
+        ConcurrentHashMap<String, AtomicInteger> stats = new ConcurrentHashMap<>();
+        CopyOnWriteArrayList<String> errors = new CopyOnWriteArrayList<>();
+
+        try (Stream<Path> fileStream = isRecursive ? Files.walk(targetDir, MAX_SCAN_DEPTH) : Files.list(targetDir)) {
+            List<Path> modelsToProcess = fileStream
                     .filter(Files::isRegularFile)
                     .filter(p -> p.toString().toLowerCase().endsWith(".safetensors"))
                     .filter(this::isMissingSidecar)
                     .toList();
+
+            int totalProcessed = modelsToProcess.size();
+            logger.info("Found {} models missing metadata sidecars.", totalProcessed);
+
+            List<Future<?>> fetchFutures = new ArrayList<>();
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                for (Path modelPath : modelsToProcess) {
+                    fetchFutures.add(executor.submit(() -> processMissingMetadata(modelPath, isDryRun, stats, errors)));
+                }
+            }
+            for (Future<?> f : fetchFutures) {
+                try { f.get(); } catch (ExecutionException e) {
+                    logger.error("Fetch task failed unexpectedly: {}", e.getCause().getMessage(), e.getCause());
+                    errors.add("Fetch task failure: " + e.getCause().getMessage());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+
+            logger.info("Metadata fetch task completed.");
+
+            Map<String, Integer> finalStats = stats.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
+
+            int totalUncategorized = finalStats.getOrDefault("Not Found on Civitai", 0);
+
+            return new OperationReport("Metadata fetch completed successfully.", finalStats, new ArrayList<>(errors), totalProcessed, totalUncategorized);
+
         } catch (IOException e) {
             throw new OrganizerException("Failed to scan target directory: " + targetDir, e);
         }
-
-        logger.info("Found {} models missing metadata sidecars.", modelsToProcess.size());
-
-        runConcurrently(modelsToProcess, this::processMissingMetadata);
-
-        logger.info("Metadata fetch task completed.");
     }
 
     private static final int MIN_COMMON_ROOT_LENGTH = 8;
@@ -175,8 +233,10 @@ public class OrganizationService {
         return file.getParent().resolve(stem.trim()).toString();
     }
 
-    private void processGroup(String groupKey, List<Path> files, Path targetDir, Set<String> allowedSet) {
+    private void processGroup(String groupKey, List<Path> files, Path targetDir, Set<String> allowedSet, boolean isDryRun,
+                              ConcurrentHashMap<String, AtomicInteger> stats, CopyOnWriteArrayList<String> errors) {
         String baseName = Path.of(groupKey).getFileName().toString().trim();
+        String dryRunPrefix = isDryRun ? "[DRY RUN] " : "";
 
         try {
             String architecture = resolveArchitecture(baseName, files).trim();
@@ -192,21 +252,31 @@ public class OrganizationService {
             }
 
             Path architectureDir = targetDir.resolve(architecture);
-            ensureDirectoryExists(architectureDir);
+            if (!isDryRun) {
+                ensureDirectoryExists(architectureDir);
+            }
 
             for (Path file : files) {
                 Path targetPath = architectureDir.resolve(file.getFileName().toString().trim());
                 if (!file.toAbsolutePath().equals(targetPath.toAbsolutePath())) {
-                    Files.move(file, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                    if (!isDryRun) {
+                        Files.move(file, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                    }
                 }
             }
 
-            logger.info("Moved group '{}' ({} files) → '{}'", baseName, files.size(), architecture);
+            logger.info("{}{}", dryRunPrefix, String.format("Moved group '%s' (%d files) → '%s'", baseName, files.size(), architecture));
+
+            stats.computeIfAbsent(architecture, k -> new AtomicInteger(0)).incrementAndGet();
 
         } catch (IOException e) {
-            logger.error("IO error processing group '{}'", baseName, e);
+            String msg = String.format("IO error processing group '%s': %s", baseName, e.getMessage());
+            logger.error(msg, e);
+            errors.add(msg);
         } catch (Exception e) {
-            logger.error("Unexpected error processing group '{}'", baseName, e);
+            String msg = String.format("Unexpected error processing group '%s': %s", baseName, e.getMessage());
+            logger.error(msg, e);
+            errors.add(msg);
         }
     }
 
@@ -238,16 +308,23 @@ public class OrganizationService {
         return !Files.exists(sidecarPath);
     }
 
-    private void processMissingMetadata(Path modelPath) {
+    private void processMissingMetadata(Path modelPath, boolean isDryRun, ConcurrentHashMap<String, AtomicInteger> stats, CopyOnWriteArrayList<String> errors) {
         String fileName = modelPath.getFileName().toString();
         String baseName = fileName.substring(0, fileName.lastIndexOf('.')).trim();
 
         try {
+            if (isDryRun) {
+                logger.info("[DRY RUN] Would fetch metadata for: {}", fileName);
+                stats.computeIfAbsent("Simulated Fetches", k -> new AtomicInteger(0)).incrementAndGet();
+                return;
+            }
+
             logger.debug("Fetching missing metadata for: {}", fileName);
             String hash = civitaiApiClient.hashWithTiming(modelPath);
             String jsonResponse = civitaiApiClient.fetchMetadataByHash(hash);
 
             if (jsonResponse == null) {
+                stats.computeIfAbsent("Not Found on Civitai", k -> new AtomicInteger(0)).incrementAndGet();
                 return;
             }
 
@@ -255,12 +332,16 @@ public class OrganizationService {
             Files.writeString(sidecarPath, jsonResponse,
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
             logger.info("Saved metadata sidecar for '{}'", fileName);
+            stats.computeIfAbsent("Metadata Retrieved", k -> new AtomicInteger(0)).incrementAndGet();
 
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
             downloadPreviewImageIfAbsent(rootNode, modelPath, baseName);
 
         } catch (Exception e) {
-            logger.error("Failed to fetch metadata for '{}': {}", fileName, e.getMessage());
+            String msg = String.format("Failed to fetch metadata for '%s': %s", fileName, e.getMessage());
+            logger.error(msg);
+            errors.add(msg);
+            stats.computeIfAbsent("Errors", k -> new AtomicInteger(0)).incrementAndGet();
         }
     }
 
@@ -319,14 +400,6 @@ public class OrganizationService {
     private static void ensureDirectoryExists(Path dir) throws IOException {
         if (!Files.exists(dir)) {
             Files.createDirectories(dir);
-        }
-    }
-
-    private <T> void runConcurrently(Iterable<T> items, java.util.function.Consumer<T> task) {
-        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-            for (T item : items) {
-                executor.submit(() -> task.accept(item));
-            }
         }
     }
 }

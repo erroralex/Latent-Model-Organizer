@@ -1,25 +1,27 @@
 /**
- * The secure bridge between the Electron main process and the Vue 3 renderer.
+ * @file preload.js — Latent Model Organizer
  *
- * This script executes in a privileged context with limited access to Node.js APIs,
- * enabling secure communication between the untrusted web frontend and the trusted
- * desktop environment. It uses contextBridge and contextIsolation to prevent 
- * the renderer from having direct access to native system calls.
+ * Secure bridge between the Electron main process and the Vue 3 renderer.
+ * Uses contextBridge + contextIsolation so the renderer never has direct
+ * Node.js access.
  *
- * Exposed APIs include:
- * - electronAPI: Provides methods for native features like directory selection dialogs.
- * - windowAPI: Provides methods for controlling the application window state 
- *   (minimize, maximize, close) from the custom frontend title bar.
+ * Exposed surface must exactly match what the Vue files call:
+ *   window.electronAPI.selectFolder()   → dialog:selectFolder  (App.vue)
+ *   window.electronAPI.openExternal(url)→ shell:openExternal   (SettingsModal.vue)
+ *   window.windowAPI.minimize()         → window:minimize      (App.vue)
+ *   window.windowAPI.maximize()         → window:maximize      (App.vue)
+ *   window.windowAPI.close()            → window:close         (App.vue)
  */
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, shell } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-    selectFolder: () => ipcRenderer.invoke('dialog:selectFolder')
+    selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
+    openExternal: (url) => ipcRenderer.send('shell:openExternal', url),
 });
 
 contextBridge.exposeInMainWorld('windowAPI', {
     minimize: () => ipcRenderer.send('window:minimize'),
     maximize: () => ipcRenderer.send('window:maximize'),
-    close: () => ipcRenderer.send('window:close')
+    close:    () => ipcRenderer.send('window:close'),
 });

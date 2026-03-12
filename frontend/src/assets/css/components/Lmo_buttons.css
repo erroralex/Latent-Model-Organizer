@@ -1,0 +1,164 @@
+/**
+ * LMO Button Extensions
+ * Drop this alongside the existing buttons.css.
+ * Provides the nav-btn / active-nav-btn / window-close-btn pattern
+ * that exactly mirrors Latent Library's header navigation style.
+ */
+
+/* ── Nav buttons (header tabs + icon-only controls) ──────────────────────── */
+.nav-btn {
+    display:         inline-flex;
+    align-items:     center;
+    gap:             6px;
+    padding:         7px 14px;
+    border:          none;
+    border-radius:   8px;
+    background:      transparent;
+    color:           var(--text-secondary);
+    font-size:       0.88rem;
+    font-weight:     600;
+    cursor:          pointer;
+    white-space:     nowrap;
+    position:        relative;
+    z-index:         1;
+    overflow:        visible;
+    transition:      color 0.2s, transform 0.2s cubic-bezier(0.25,0.8,0.25,1);
+}
+
+/* Ghost background layer */
+.nav-btn::after {
+    content:      '';
+    position:     absolute;
+    inset:        0;
+    border-radius:8px;
+    background:   transparent;
+    border:       1px solid transparent;
+    z-index:      -1;
+    transition:   background 0.2s, border-color 0.2s;
+}
+
+/* Glow halo layer */
+.nav-btn::before {
+    content:      '';
+    position:     absolute;
+    inset:        -1px;
+    border-radius:9px;
+    background:   var(--grad-hover);
+    z-index:      -2;
+    opacity:      0;
+    filter:       blur(5px);
+    transition:   opacity 0.25s;
+}
+
+.nav-btn:hover:not(:disabled) {
+    color:     var(--text-primary);
+    transform: translateY(-1px);
+}
+.nav-btn:hover:not(:disabled)::after  { background: var(--bg-btn-inner); border-color: rgba(255,255,255,0.08); }
+.nav-btn:hover:not(:disabled)::before { opacity: 0.7; }
+
+.nav-btn:active:not(:disabled) { transform: translateY(0); }
+
+.nav-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Icon-only variant */
+.nav-btn.icon-only { padding: 7px 10px; }
+
+/* Active / selected state */
+.active-nav-btn {
+    color: transparent !important;
+}
+.active-nav-btn::after  { background: var(--bg-btn-inner) !important; border-color: rgba(255,255,255,0.08) !important; }
+.active-nav-btn::before { opacity: 0.8 !important; }
+
+.active-nav-btn .pi,
+.active-nav-btn span {
+    background:              var(--grad-text);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip:         text;
+    color:                   transparent !important;
+    font-weight:             700;
+}
+
+/* ── Window Close button (red halo on hover) ─────────────────────────────── */
+.window-close-btn::before {
+    background: var(--status-danger) !important;
+}
+.window-close-btn:hover:not(:disabled) .pi {
+    -webkit-text-fill-color: var(--text-primary) !important;
+    background:              none !important;
+    color:                   var(--text-primary) !important;
+}
+
+/* ── Primary action button ───────────────────────────────────────────────── */
+.primary-btn {
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    gap:             8px;
+    width:           100%;
+    padding:         12px 20px;
+    border:          none;
+    border-radius:   8px;
+    background:      var(--accent-primary);
+    color:           #000;
+    font-size:       1rem;
+    font-weight:     700;
+    cursor:          pointer;
+    margin-top:      4px;
+    transition:      filter 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.primary-btn:hover:not(:disabled)  { filter: brightness(1.1); box-shadow: 0 0 18px rgba(var(--accent-rgb, 102,252,241), 0.35); transform: translateY(-1px); }
+.primary-btn:active:not(:disabled) { transform: translateY(0); filter: brightness(0.95); }
+.primary-btn:disabled              { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Secondary button ────────────────────────────────────────────────────── */
+.secondary-btn {
+    display:      inline-flex;
+    align-items:  center;
+    gap:          6px;
+    padding:      9px 16px;
+    border-radius:6px;
+    border:       1px solid var(--border-input);
+    background:   var(--bg-input);
+    color:        var(--text-secondary);
+    font-size:    0.88rem;
+    font-weight:  600;
+    cursor:       pointer;
+    white-space:  nowrap;
+    flex-shrink:  0;
+    transition:   border-color 0.2s, color 0.2s, background 0.2s;
+}
+.secondary-btn:hover:not(:disabled)  { border-color: var(--accent-primary); color: var(--accent-primary); background: var(--bg-btn-inner); }
+.secondary-btn:disabled              { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Link button ─────────────────────────────────────────────────────────── */
+.link-btn {
+    background:  none;
+    border:      none;
+    cursor:      pointer;
+    color:       var(--accent-primary);
+    font-size:   0.78rem;
+    font-weight: 700;
+    padding:     2px 4px;
+    opacity:     0.8;
+    transition:  opacity 0.15s;
+    border-radius: 3px;
+}
+.link-btn:hover:not(:disabled)  { opacity: 1; text-decoration: underline; }
+.link-btn:disabled               { opacity: 0.3; cursor: default; }
+
+/* ── Glass input ─────────────────────────────────────────────────────────── */
+.glass-input {
+    flex:          1;
+    padding:       9px 12px;
+    border:        1px solid var(--border-input);
+    border-radius: 6px;
+    background:    var(--bg-input);
+    color:         var(--text-primary);
+    font-size:     0.88rem;
+    transition:    border-color 0.2s, box-shadow 0.2s;
+}
+.glass-input:focus         { outline: none; border-color: var(--accent-primary); box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 102,252,241), 0.12); }
+.glass-input::placeholder  { color: var(--text-muted); }
