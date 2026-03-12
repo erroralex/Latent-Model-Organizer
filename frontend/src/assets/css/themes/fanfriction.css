@@ -27,6 +27,7 @@ body.theme-fanfriction {
     --accent-primary: #d2b48c;
     --accent-secondary: #a0522d;
     --accent-hover: #e6cdb3;
+    --accent-rgb: 210, 180, 140;
 
     /* Gradients */
     --grad-text: linear-gradient(45deg, #d2b48c, #e6cdb3);
@@ -35,11 +36,21 @@ body.theme-fanfriction {
 
     /* Shadows */
     --shadow-panel: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+    --shadow-glow-primary: 0 0 10px rgba(210, 180, 140, 0.2);
+    --shadow-glow-secondary: 0 0 15px rgba(160, 82, 45, 0.2);
 
     /* Status Colors */
     --status-success: #6b8e23;
     --status-warning: #daa520;
     --status-danger: #cd5c5c;
+
+    /* Glass gloss overlay */
+    --app-glass-gloss: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 60%);
+
+    /* Scrollbars */
+    --scrollbar-track: rgba(0, 0, 0, 0.15);
+    --scrollbar-thumb: rgba(210, 180, 140, 0.2);
+    --scrollbar-thumb-hover: rgba(210, 180, 140, 0.35);
 }
 
 /* PrimeVue Overrides for Fan Friction */

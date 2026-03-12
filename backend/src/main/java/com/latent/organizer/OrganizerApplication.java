@@ -3,6 +3,7 @@ package com.latent.organizer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.latent.organizer.api.LogStreamHandler;
 import com.latent.organizer.domain.FetchRequest;
+import com.latent.organizer.domain.OperationReport;
 import com.latent.organizer.domain.OrganizationRequest;
 import com.latent.organizer.exception.OrganizerException;
 import com.latent.organizer.service.ModelAnalyzer;
@@ -28,20 +29,6 @@ import java.util.concurrent.Executors;
  * <p>This application serves as a lightweight orchestration engine for managing and organizing large-scale
  * machine learning model collections. It exposes a specialized REST API that facilitates automatic
  * architecture identification, multi-pass file grouping, and real-time activity monitoring.</p>
- *
- * <p>Key architectural components:
- * <ul>
- *     <li><b>Java HttpServer:</b> Utilizes the built-in, low-overhead {@link com.sun.net.httpserver.HttpServer}
- *     to provide reliable API endpoints without the weight of a full application server.</li>
- *     <li><b>Project Loom (Virtual Threads):</b> Leverages {@code Executors.newVirtualThreadPerTaskExecutor()}
- *     to handle I/O-bound requests and file system operations with elite high-concurrency efficiency.</li>
- *     <li><b>SSE Logging:</b> Implements a native streaming bridge to push internal SLF4J logs directly
- *     to the frontend console via Server-Sent Events.</li>
- * </ul>
- * </p>
- *
- * <p>The backend follows a domain-driven structure, delegating complex analysis to the {@link ModelAnalyzer}
- * and file system orchestration to the {@link OrganizationService}.</p>
  */
 public class OrganizerApplication {
 
@@ -55,7 +42,7 @@ public class OrganizerApplication {
             OrganizationService organizationService = new OrganizationService(modelAnalyzer);
 
             HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
-
+            
             server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
             server.createContext("/api/organize", new OrganizeHandler(organizationService));
@@ -102,12 +89,14 @@ public class OrganizerApplication {
                     return;
                 }
 
-                organizationService.organizeModels(
-                        Paths.get(request.sourceDirectory()),
-                        Paths.get(request.targetDirectory()),
-                        request.allowedArchitectures()
+                OperationReport report = organizationService.organizeModels(
+                    Paths.get(request.sourceDirectory()), 
+                    Paths.get(request.targetDirectory()), 
+                    request.allowedArchitectures(),
+                    request.isRecursive(),
+                    request.isDryRun()
                 );
-                sendSuccess(exchange, "Organization completed successfully.");
+                sendJson(exchange, 200, report);
             } catch (OrganizerException e) {
                 logger.error("Business logic error", e);
                 sendError(exchange, 400, e.getMessage());
@@ -147,8 +136,12 @@ public class OrganizerApplication {
                     return;
                 }
 
-                organizationService.fetchMissingMetadata(Paths.get(request.targetDirectory()));
-                sendSuccess(exchange, "Metadata fetch completed successfully.");
+                OperationReport report = organizationService.fetchMissingMetadata(
+                    Paths.get(request.targetDirectory()),
+                    request.isRecursive(),
+                    request.isDryRun()
+                );
+                sendJson(exchange, 200, report);
             } catch (OrganizerException e) {
                 logger.error("Business logic error during fetch", e);
                 sendError(exchange, 400, e.getMessage());
@@ -180,12 +173,11 @@ public class OrganizerApplication {
 
             logger.info("Received shutdown signal.");
             sendJson(exchange, 200, Map.of("status", "shutting down"));
-
+            
             Thread.ofVirtual().start(() -> {
                 try {
                     Thread.sleep(100);
-                } catch (InterruptedException ignored) {
-                }
+                } catch (InterruptedException ignored) {}
                 logger.info("Stopping HTTP Server...");
                 server.stop(0);
                 System.exit(0);
@@ -197,10 +189,6 @@ public class OrganizerApplication {
         exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
         exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
-    }
-
-    private static void sendSuccess(HttpExchange exchange, String message) throws IOException {
-        sendJson(exchange, 200, Map.of("status", "success", "message", message));
     }
 
     private static void sendError(HttpExchange exchange, int statusCode, String message) throws IOException {

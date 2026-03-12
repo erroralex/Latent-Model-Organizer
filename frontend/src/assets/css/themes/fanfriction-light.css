@@ -27,6 +27,7 @@ body.theme-fanfriction-light {
     --accent-primary: #a0522d;
     --accent-secondary: #d2b48c;
     --accent-hover: #8b4513;
+    --accent-rgb: 160, 82, 45;
 
     /* Gradients */
     --grad-text: linear-gradient(45deg, #a0522d, #8b4513);
@@ -35,11 +36,21 @@ body.theme-fanfriction-light {
 
     /* Shadows */
     --shadow-panel: 0 8px 32px 0 rgba(60, 50, 40, 0.15);
+    --shadow-glow-primary: 0 0 10px rgba(160, 82, 45, 0.2);
+    --shadow-glow-secondary: 0 0 15px rgba(210, 180, 140, 0.2);
 
     /* Status Colors */
     --status-success: #556b2f;
     --status-warning: #b8860b;
     --status-danger: #a52a2a;
+
+    /* Glass gloss overlay */
+    --app-glass-gloss: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%);
+
+    /* Scrollbars */
+    --scrollbar-track: rgba(60, 50, 40, 0.06);
+    --scrollbar-thumb: rgba(160, 82, 45, 0.2);
+    --scrollbar-thumb-hover: rgba(160, 82, 45, 0.35);
 }
 
 /* PrimeVue Overrides for Fan Friction Light */

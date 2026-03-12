@@ -9,6 +9,12 @@ package com.latent.organizer.domain;
  *
  * @param targetDirectory The absolute path of the directory tree to be scanned for models
  *                        lacking {@code .civitai.info} documentation.
+ * @param isRecursive     If true, the service will scan subdirectories of the target folder.
+ * @param isDryRun        If true, the service will simulate the fetching process without downloading files.
  */
-public record FetchRequest(String targetDirectory) {
+public record FetchRequest(
+    String targetDirectory,
+    boolean isRecursive,
+    boolean isDryRun
+) {
 }

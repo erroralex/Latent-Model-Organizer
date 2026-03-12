@@ -3,25 +3,24 @@ package com.latent.organizer.domain;
 import java.util.List;
 
 /**
- * <p>A Data Transfer Object (DTO) for orchestrating model organization requests.</p>
+ * <p>Data Transfer Object (DTO) for orchestrating model organization requests.</p>
  *
- * <p>This record encapsulates all the parameters required to execute an
- * organization process, including the source and destination paths, and
- * a whitelist of architectural types to process. If {@code allowedArchitectures}
- * is empty or {@code null}, all identified model architectures will be processed
- * by the system.</p>
+ * <p>This immutable record defines the contractual parameters required to execute a model
+ * organization process. It encapsulates the operational scope (source/target directories),
+ * filtering criteria (allowed architectures), and behavioral flags (recursion, dry run).</p>
  *
- * @param sourceDirectory
- *         The absolute path of the directory containing the model files.
- * @param targetDirectory
- *         The absolute path of the directory where files should be organized.
- * @param allowedArchitectures
- *         The list of architectures to organize (e.g., "SDXL", "Flux").
- *         If null or empty, all architectures are processed.
+ * @param sourceDirectory      The absolute path of the directory containing the unorganized model files.
+ * @param targetDirectory      The absolute path of the directory where organized subdirectories will be created.
+ * @param allowedArchitectures A whitelist of architectural types to process. If empty, all types are included.
+ * @param isRecursive          If true, the organization engine will traverse the full directory tree of the source.
+ * @param isDryRun             If true, the operation will simulate the movement and categorization without
+ *                             modifying the file system.
  */
 public record OrganizationRequest(
-        String sourceDirectory,
-        String targetDirectory,
-        List<String> allowedArchitectures
+    String sourceDirectory,
+    String targetDirectory,
+    List<String> allowedArchitectures,
+    boolean isRecursive,
+    boolean isDryRun
 ) {
 }

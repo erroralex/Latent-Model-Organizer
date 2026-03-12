@@ -37,6 +37,7 @@
     /* --- Accents & Gradients --- */
     --accent-primary: #007bff;
     --accent-secondary: #0056b3;
+    --accent-rgb: 0, 123, 255;
     --grad-text: linear-gradient(90deg, #007bff, #0056b3);
     --grad-hover: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
     --grad-border: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
@@ -51,6 +52,9 @@
     --shadow-panel: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     --shadow-glow-primary: 0 0 8px rgba(0, 123, 255, 0.4);
     --shadow-glow-secondary: 0 0 8px rgba(0, 86, 179, 0.4);
+
+    /* --- Glass gloss overlay --- */
+    --app-glass-gloss: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, transparent 60%);
 
     /* --- Scrollbars --- */
     --scrollbar-track: #e9ecef;
