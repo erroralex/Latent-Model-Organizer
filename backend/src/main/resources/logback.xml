@@ -1,0 +1,20 @@
+<configuration>
+    <!-- Standard Console Appender (for IDE output) -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Custom SSE Appender (for Frontend console) -->
+    <appender name="SSE" class="com.latent.organizer.api.SseLogAppender" />
+
+    <!-- Root Logger Configuration -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+        <appender-ref ref="SSE" />
+    </root>
+
+    <!-- Enable detailed logging for the application -->
+    <logger name="com.latent" level="DEBUG" />
+</configuration>
