@@ -1,6 +1,8 @@
 package com.latent.organizer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.latent.organizer.api.LogStreamHandler;
+import com.latent.organizer.domain.FetchRequest;
 import com.latent.organizer.domain.OrganizationRequest;
 import com.latent.organizer.exception.OrganizerException;
 import com.latent.organizer.service.ModelAnalyzer;
@@ -16,28 +18,30 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
 /**
- * <p>The entry point for the Latent Model Organizer Backend application.</p>
+ * <p>The main entry point for the Latent Model Organizer Backend application.</p>
  *
- * <p>This application provides a lightweight REST API for organizing machine learning model files
- * (specifically those used in latent diffusion models) based on their metadata and architecture.
- * It utilizes the built-in Java {@link com.sun.net.httpserver.HttpServer} to minimize external dependencies
- * while leveraging Java 21's Virtual Threads for high-performance, non-blocking I/O operations.</p>
+ * <p>This application serves as a lightweight orchestration engine for managing and organizing large-scale
+ * machine learning model collections. It exposes a specialized REST API that facilitates automatic
+ * architecture identification, multi-pass file grouping, and real-time activity monitoring.</p>
  *
- * <p>The server exposes two primary endpoints:
+ * <p>Key architectural components:
  * <ul>
- *     <li>{@code /api/organize}: Orchestrates the analysis and movement of model files.</li>
- *     <li>{@code /api/shutdown}: Provides a mechanism for graceful server termination.</li>
+ *     <li><b>Java HttpServer:</b> Utilizes the built-in, low-overhead {@link com.sun.net.httpserver.HttpServer}
+ *     to provide reliable API endpoints without the weight of a full application server.</li>
+ *     <li><b>Project Loom (Virtual Threads):</b> Leverages {@code Executors.newVirtualThreadPerTaskExecutor()}
+ *     to handle I/O-bound requests and file system operations with elite high-concurrency efficiency.</li>
+ *     <li><b>SSE Logging:</b> Implements a native streaming bridge to push internal SLF4J logs directly
+ *     to the frontend console via Server-Sent Events.</li>
  * </ul>
  * </p>
  *
- * <p>The application follows a clean architectural approach, delegating business logic to specialized
- * services while the main class handles server lifecycle and dependency wiring.</p>
+ * <p>The backend follows a domain-driven structure, delegating complex analysis to the {@link ModelAnalyzer}
+ * and file system orchestration to the {@link OrganizationService}.</p>
  */
 public class OrganizerApplication {
 
@@ -55,11 +59,13 @@ public class OrganizerApplication {
             server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
             server.createContext("/api/organize", new OrganizeHandler(organizationService));
+            server.createContext("/api/fetch", new FetchHandler(organizationService));
+            server.createContext("/api/logs", new LogStreamHandler());
             server.createContext("/api/shutdown", new ShutdownHandler(server));
 
             server.start();
             logger.info("Latent Model Organizer Backend started on port {}", PORT);
-            logger.info("Ready to accept requests at http://localhost:{}/api/organize", PORT);
+            logger.info("Ready to accept requests at http://localhost:{}", PORT);
 
         } catch (IOException e) {
             logger.error("Failed to start server", e);
@@ -67,15 +73,7 @@ public class OrganizerApplication {
         }
     }
 
-    /**
-     * <p>Internal handler for processing model organization requests.</p>
-     *
-     * <p>This handler manages the HTTP lifecycle for the {@code /api/organize} endpoint,
-     * including CORS header management, request validation, and JSON deserialization.
-     * It delegates the actual file organization logic to the {@link OrganizationService}.</p>
-     */
     static class OrganizeHandler implements HttpHandler {
-
         private final OrganizationService organizationService;
 
         public OrganizeHandler(OrganizationService organizationService) {
@@ -85,12 +83,10 @@ public class OrganizerApplication {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             addCorsHeaders(exchange);
-
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(204, -1);
                 return;
             }
-
             if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendError(exchange, 405, "Method Not Allowed");
                 return;
@@ -99,7 +95,6 @@ public class OrganizerApplication {
             try {
                 InputStream requestBody = exchange.getRequestBody();
                 OrganizationRequest request = objectMapper.readValue(requestBody, OrganizationRequest.class);
-
                 logger.info("Received organization request: {}", request);
 
                 if (request.sourceDirectory() == null || request.targetDirectory() == null) {
@@ -107,13 +102,12 @@ public class OrganizerApplication {
                     return;
                 }
 
-                Path sourcePath = Paths.get(request.sourceDirectory());
-                Path targetPath = Paths.get(request.targetDirectory());
-
-                organizationService.organizeModels(sourcePath, targetPath, request.allowedArchitectures());
-
+                organizationService.organizeModels(
+                        Paths.get(request.sourceDirectory()),
+                        Paths.get(request.targetDirectory()),
+                        request.allowedArchitectures()
+                );
                 sendSuccess(exchange, "Organization completed successfully.");
-
             } catch (OrganizerException e) {
                 logger.error("Business logic error", e);
                 sendError(exchange, 400, e.getMessage());
@@ -124,13 +118,47 @@ public class OrganizerApplication {
         }
     }
 
-    /**
-     * <p>Internal handler for triggering a graceful application shutdown.</p>
-     *
-     * <p>When a authorized POST request is received, it initiates a delayed shutdown
-     * sequence in a separate Virtual Thread, allowing the response to be sent back
-     * to the client before the server stops.</p>
-     */
+    static class FetchHandler implements HttpHandler {
+        private final OrganizationService organizationService;
+
+        public FetchHandler(OrganizationService organizationService) {
+            this.organizationService = organizationService;
+        }
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            addCorsHeaders(exchange);
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendError(exchange, 405, "Method Not Allowed");
+                return;
+            }
+
+            try {
+                InputStream requestBody = exchange.getRequestBody();
+                FetchRequest request = objectMapper.readValue(requestBody, FetchRequest.class);
+                logger.info("Received fetch request: {}", request);
+
+                if (request.targetDirectory() == null) {
+                    sendError(exchange, 400, "Target directory is required.");
+                    return;
+                }
+
+                organizationService.fetchMissingMetadata(Paths.get(request.targetDirectory()));
+                sendSuccess(exchange, "Metadata fetch completed successfully.");
+            } catch (OrganizerException e) {
+                logger.error("Business logic error during fetch", e);
+                sendError(exchange, 400, e.getMessage());
+            } catch (Exception e) {
+                logger.error("Internal server error during fetch", e);
+                sendError(exchange, 500, "Internal Server Error: " + e.getMessage());
+            }
+        }
+    }
+
     static class ShutdownHandler implements HttpHandler {
         private final HttpServer server;
 
@@ -141,30 +169,25 @@ public class OrganizerApplication {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             addCorsHeaders(exchange);
-
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(204, -1);
                 return;
             }
-
             if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                 sendError(exchange, 405, "Method Not Allowed");
                 return;
             }
 
             logger.info("Received shutdown signal.");
-            Map<String, String> response = Map.of("status", "shutting down");
-            sendJson(exchange, 200, response);
+            sendJson(exchange, 200, Map.of("status", "shutting down"));
 
             Thread.ofVirtual().start(() -> {
                 try {
                     Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    // Ignore
+                } catch (InterruptedException ignored) {
                 }
                 logger.info("Stopping HTTP Server...");
                 server.stop(0);
-                logger.info("JVM exiting.");
                 System.exit(0);
             });
         }
@@ -172,24 +195,16 @@ public class OrganizerApplication {
 
     private static void addCorsHeaders(HttpExchange exchange) {
         exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "POST, OPTIONS");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
     }
 
     private static void sendSuccess(HttpExchange exchange, String message) throws IOException {
-        Map<String, String> response = Map.of(
-                "status", "success",
-                "message", message
-        );
-        sendJson(exchange, 200, response);
+        sendJson(exchange, 200, Map.of("status", "success", "message", message));
     }
 
     private static void sendError(HttpExchange exchange, int statusCode, String message) throws IOException {
-        Map<String, String> response = Map.of(
-                "status", "error",
-                "message", message
-        );
-        sendJson(exchange, statusCode, response);
+        sendJson(exchange, statusCode, Map.of("status", "error", "message", message));
     }
 
     private static void sendJson(HttpExchange exchange, int statusCode, Object response) throws IOException {

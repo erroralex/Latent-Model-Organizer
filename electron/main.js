@@ -22,8 +22,8 @@ const { exec } = require('child_process');
 
 function createWindow() {
     const mainWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
+        width: 1400,
+        height: 1200,
         title: "Latent Model Organizer",
         frame: false,
         webPreferences: {
