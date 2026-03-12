@@ -1,18 +1,51 @@
+/**
+ * The root component of the Latent Model Organizer frontend.
+ *
+ * This component serves as the primary user interface, providing a centralized
+ * dashboard for orchestrating model organization tasks. It integrates theme management,
+ * directory selection via Electron IPC, and handles the communication with the
+ * backend REST API.
+ *
+ * Key functionalities include:
+ * - Directory Orchestration: Managing source and target path selection via Electron dialogs.
+ * - Architecture Filtering: Providing a UI for selecting specific model architectures to process.
+ * - Process Monitoring: Communicating task status and handling API responses.
+ * - Window Management: Implementing custom title bar controls (minimize, maximize, close)
+ *   compatible with Electron's frameless window architecture.
+ */
 <script setup>
 import { ref } from 'vue';
+import { useTheme } from './composables/useTheme';
+
+const { currentTheme, availableThemes, applyTheme } = useTheme();
 
 const sourceFolder = ref('');
 const targetFolder = ref('');
 const statusMessage = ref('Ready.');
 const isProcessing = ref(false);
 
+const knownArchitectures = ['SD 1.5', 'SD 1.4', 'SDXL', 'Pony', 'Flux', 'SD 3.5', 'Illustrious', 'Sana', 'Noob V', 'Unknown'];
+const selectedArchitectures = ref([...knownArchitectures]);
+
+const minimizeWindow = () => {
+  window.windowAPI?.minimize();
+};
+
+const maximizeWindow = () => {
+  window.windowAPI?.maximize();
+};
+
+const closeWindow = () => {
+  window.windowAPI?.close();
+};
+
 const pickSource = async () => {
-  const folder = await window.electronAPI.selectFolder();
+  const folder = await window.electronAPI?.selectFolder();
   if (folder) sourceFolder.value = folder;
 };
 
 const pickTarget = async () => {
-  const folder = await window.electronAPI.selectFolder();
+  const folder = await window.electronAPI?.selectFolder();
   if (folder) targetFolder.value = folder;
 };
 
@@ -22,17 +55,24 @@ const executeOrganization = async () => {
     return;
   }
 
+  if (selectedArchitectures.value.length === 0) {
+    statusMessage.value = "⚠️ Please select at least one architecture.";
+    return;
+  }
+
   isProcessing.value = true;
   statusMessage.value = "⏳ Scanning and organizing models... Please wait.";
 
+  const apiUrl = window.location.hostname === 'localhost' ? '/api/organize' : 'http://localhost:8080/api/organize';
+
   try {
-    // Call the Java 21 Backend
-    const response = await fetch('http://localhost:8080/api/organize', {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sourceDirectory: sourceFolder.value,
-        targetDirectory: targetFolder.value
+        targetDirectory: targetFolder.value,
+        allowedArchitectures: selectedArchitectures.value
       })
     });
 
@@ -40,10 +80,11 @@ const executeOrganization = async () => {
       throw new Error(`Server responded with status: ${response.status}`);
     }
 
-    statusMessage.value = "✅ Organization Complete! Check your target folder.";
+    const data = await response.json();
+    statusMessage.value = "✅ " + (data.message || "Organization Complete!");
   } catch (error) {
     console.error("Organization failed:", error);
-    statusMessage.value = "❌ Error: Could not connect to the backend. Is the Java server running?";
+    statusMessage.value = "❌ Error: Could not connect to the backend.";
   } finally {
     isProcessing.value = false;
   }
@@ -51,51 +92,84 @@ const executeOrganization = async () => {
 </script>
 
 <template>
-  <main class="container">
-    <h1>Latent Model Organizer</h1>
-
-    <div class="card">
-      <div class="form-group">
-        <label>Source Directory (Unorganized Models):</label>
-        <div class="input-row">
-          <input type="text" readonly :value="sourceFolder" placeholder="No folder selected..." />
-          <button @click="pickSource" :disabled="isProcessing">Browse</button>
-        </div>
+  <div class="app-wrapper">
+    <header class="app-header draggable-header">
+      <div class="header-left no-drag">
+        <h1 class="text-gradient">Latent Model Organizer</h1>
       </div>
 
-      <div class="form-group">
-        <label>Target Directory (Organized Output):</label>
-        <div class="input-row">
-          <input type="text" readonly :value="targetFolder" placeholder="No folder selected..." />
-          <button @click="pickTarget" :disabled="isProcessing">Browse</button>
+      <div class="header-right no-drag">
+        <div class="theme-switcher">
+          <label for="theme-select">Theme:</label>
+          <select
+              id="theme-select"
+              :value="currentTheme"
+              @change="(e) => applyTheme(e.target.value)"
+          >
+            <option v-for="theme in availableThemes" :key="theme" :value="theme">
+              {{ theme.charAt(0).toUpperCase() + theme.slice(1) }}
+            </option>
+          </select>
+        </div>
+
+        <div class="window-controls">
+          <button class="win-btn" @click="minimizeWindow" title="Minimize">─</button>
+          <button class="win-btn" @click="maximizeWindow" title="Maximize">□</button>
+          <button class="win-btn close" @click="closeWindow" title="Close">✕</button>
         </div>
       </div>
+    </header>
 
-      <button class="primary-btn" @click="executeOrganization" :disabled="isProcessing">
-        {{ isProcessing ? 'Organizing...' : 'Start Organization' }}
-      </button>
-    </div>
+    <main class="container">
+      <div class="glass-panel card">
+        <div class="form-group">
+          <label>Source Directory (Unorganized Models):</label>
+          <div class="input-row">
+            <input type="text" class="glass-input" readonly :value="sourceFolder" placeholder="No folder selected..." />
+            <button class="secondary-btn" @click="pickSource" :disabled="isProcessing">Browse</button>
+          </div>
+        </div>
 
-    <div class="status-bar" :class="{ 'error': statusMessage.includes('❌') }">
-      {{ statusMessage }}
-    </div>
-  </main>
+        <div class="form-group">
+          <label>Target Directory (Organized Output):</label>
+          <div class="input-row">
+            <input type="text" class="glass-input" readonly :value="targetFolder" placeholder="No folder selected..." />
+            <button class="secondary-btn" @click="pickTarget" :disabled="isProcessing">Browse</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Architectures to Organize:</label>
+          <div class="checkbox-grid">
+            <label v-for="arch in knownArchitectures" :key="arch" class="checkbox-label">
+              <input
+                  type="checkbox"
+                  :value="arch"
+                  v-model="selectedArchitectures"
+                  :disabled="isProcessing"
+              >
+              <span>{{ arch }}</span>
+            </label>
+          </div>
+        </div>
+
+        <button class="primary-btn" @click="executeOrganization" :disabled="isProcessing">
+          <span v-if="isProcessing">Organizing...</span>
+          <span v-else>Start Organization</span>
+        </button>
+      </div>
+
+      <div class="status-bar glass-panel" :class="{ 'error': statusMessage.includes('❌') }">
+        {{ statusMessage }}
+      </div>
+    </main>
+  </div>
 </template>
 
 <style scoped>
-/* Basic styling for rapid prototyping */
-.container { font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
-h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; }
-.card { background: #f8f9fa; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-.form-group { margin-bottom: 20px; }
-label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 0.9em; }
-.input-row { display: flex; gap: 10px; }
-input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
-button { padding: 10px 15px; border: none; border-radius: 4px; background: #4a5568; color: white; cursor: pointer; font-weight: bold; }
-button:hover:not(:disabled) { background: #2d3748; }
-button:disabled { opacity: 0.6; cursor: not-allowed; }
-.primary-btn { width: 100%; background: #42b883; margin-top: 10px; font-size: 1.1em; }
-.primary-btn:hover:not(:disabled) { background: #33a06f; }
-.status-bar { margin-top: 20px; padding: 15px; text-align: center; font-weight: bold; border-radius: 4px; background: #e2e8f0; }
-.error { background: #fed7d7; color: #c53030; }
+/* Scoped styles are now minimal, relying on global component CSS */
+h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
 </style>

@@ -1,25 +1,183 @@
 /**
  * Layout & UI Components
- * Description: Reusable UI patterns like inputs, dialogs, and chips.
+ * Description: Reusable UI patterns like inputs, dialogs, and app-specific containers.
  */
 
-/* --- Inputs --- */
+/* --- Main Containers --- */
+.app-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.container {
+    font-family: var(--font-family, sans-serif);
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 30px 20px 20px 20px;
+    color: var(--text-primary);
+    flex-grow: 1;
+}
+
+/* --- Header & Navigation --- */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-header, transparent);
+    margin-bottom: 30px;
+}
+
+.header-left, .header-right {
+    display: flex;
+    align-items: center;
+}
+
+.header-right {
+    gap: 15px;
+}
+
+.draggable-header {
+    -webkit-app-region: drag;
+    user-select: none;
+}
+
+.no-drag {
+    -webkit-app-region: no-drag;
+}
+
+/* --- Window Controls --- */
+.window-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.win-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-family: "Segoe UI Symbol", sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s, color 0.2s;
+    line-height: 1;
+}
+
+.win-btn:hover {
+    background: var(--bg-btn-inner);
+    color: var(--text-primary);
+}
+
+.win-btn.close:hover {
+    background: var(--status-danger);
+    color: white;
+}
+
+/* --- Form Elements --- */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+}
+
+.input-row {
+    display: flex;
+    gap: 10px;
+}
+
 .glass-input {
-    background: var(--bg-input) !important;
-    border: 1px solid var(--border-input) !important;
-    color: var(--text-primary) !important;
-    backdrop-filter: blur(10px);
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--text-primary);
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.glass-input:enabled:focus {
-    box-shadow: none !important;
-    outline: none !important;
-    border-color: transparent !important;
-    border-image: var(--grad-hover) 1 !important;
+.glass-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 1px var(--accent-primary);
 }
 
-/* --- Dialogs --- */
+/* --- Architecture Grid & Selection --- */
+.checkbox-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: normal;
+    color: var(--text-primary);
+}
+
+.checkbox-label:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-btn-inner);
+}
+
+.checkbox-label input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: var(--accent-primary);
+}
+
+/* --- Theme Switcher --- */
+.theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.theme-switcher label {
+    margin-bottom: 0;
+}
+
+.theme-switcher select {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-input);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+/* --- Status Bar --- */
+.status-bar {
+    margin-top: 20px;
+    padding: 15px;
+    text-align: center;
+    font-weight: bold;
+    border-radius: 4px;
+    color: var(--text-primary);
+}
+
+.status-bar.error {
+    background: var(--status-danger);
+    color: #fff;
+}
+
+/* --- Dialogs & Panels --- */
 .glass-dialog {
     background: var(--bg-panel-opaque) !important;
     border: 1px solid var(--border-input) !important;
@@ -28,71 +186,7 @@
     color: var(--text-primary) !important;
 }
 
-.glass-dialog .p-dialog-header,
-.glass-dialog .p-dialog-content,
-.glass-dialog .p-dialog-footer {
-    background: transparent !important;
-    color: var(--text-primary) !important;
-    border-color: var(--border-input) !important;
-}
-
-.glass-dialog .p-dialog-header-icon {
-    color: var(--text-secondary) !important;
-}
-
-.glass-dialog .p-dialog-header-icon:hover {
-    background: rgba(255, 255, 255, 0.1) !important;
-    color: var(--text-primary) !important;
-}
-
-/* --- Custom Scrollbars --- */
-.custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: var(--scrollbar-track);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border-radius: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-thumb-hover);
-}
-
-/* --- Chips & Tags --- */
-.collection-chip {
-    background: rgba(102, 252, 241, 0.15) !important;
-    color: var(--accent-primary) !important;
-    border: 1px solid rgba(102, 252, 241, 0.3) !important;
-}
-
-.lora-chip {
-    background: transparent !important;
-    color: var(--text-primary) !important;
-    border: none !important;
-    position: relative;
-    z-index: 1;
-    overflow: visible !important;
-}
-
-.lora-chip::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    background: var(--grad-hover);
-    border-radius: 16px;
-    z-index: -2;
-}
-
-.lora-chip::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--bg-btn-inner);
-    border-radius: 16px;
-    z-index: -1;
+.glass-panel.card {
+    padding: 25px;
+    border-radius: 8px;
 }

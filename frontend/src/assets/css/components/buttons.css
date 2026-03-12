@@ -1,7 +1,23 @@
 /**
  * Button Styles
- * Description: Navigation and specialized window control buttons.
+ * Description: Navigation, action, and specialized window control buttons.
  */
+
+/* --- Base Button Styles --- */
+button {
+    padding: 10px 15px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+    color: var(--text-primary);
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 
 /* --- Navigation Buttons --- */
 .nav-btn {
@@ -71,6 +87,31 @@
     background-clip: text;
     color: transparent !important;
     font-weight: 700;
+}
+
+/* --- Action Buttons --- */
+.primary-btn {
+    width: 100%;
+    background: var(--accent-primary);
+    color: #000;
+    margin-top: 10px;
+    font-size: 1.1em;
+    border: none;
+}
+
+.primary-btn:hover:not(:disabled) {
+    filter: brightness(1.1);
+    box-shadow: 0 0 15px var(--accent-primary);
+}
+
+.secondary-btn {
+    background: var(--bg-btn-inner);
+    border: 1px solid var(--border-light);
+}
+
+.secondary-btn:hover:not(:disabled) {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
 }
 
 /* --- Window Control Buttons --- */
