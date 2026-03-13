@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nilsson.lmo.domain.ModelMetadata;
 import com.nilsson.lmo.domain.OperationReport;
+import com.nilsson.lmo.domain.UndoManifest;
+import com.nilsson.lmo.domain.UndoManifest.MoveRecord;
 import com.nilsson.lmo.exception.OrganizerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,39 +15,40 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * <p>The {@code OrganizationService} is the central orchestration layer for managing, classifying,
- * and relocating machine learning model files. It implements a sophisticated multi-pass grouping
- * engine designed to handle complex model structures and inconsistent naming conventions.</p>
+ * <p>The {@code OrganizationService} is the primary orchestration layer for the Latent Model Organizer.
+ * It implements a sophisticated, multi-pass grouping and relocation engine designed to manage
+ * massive machine learning model libraries with high precision and performance.</p>
  *
- * <p>This service coordinates between the {@link ModelAnalyzer} for architectural identification
- * and the {@link CivitaiApiClient} for external metadata enrichment. It leverages Java 21
- * Virtual Threads to parallelize I/O-intensive file operations and network requests, ensuring
- * high throughput during large-scale library reorganizations.</p>
- *
- * <p>Key Capabilities:
+ * <p>Key Functional Pillars:
  * <ul>
- *   <li><b>Intelligent Grouping:</b> Associates weights, configs, and previews using prefix matching
- *   and stem analysis to ensure atomic file movements.</li>
- *   <li><b>Scalable I/O:</b> Uses Virtual Threads for concurrent processing of model groups,
- *   minimizing execution time for thousands of files.</li>
- *   <li><b>Recursive Discovery:</b> Scans directory trees with configurable depth to find and
- *   re-organize nested collections.</li>
- *   <li><b>Non-Destructive Simulation:</b> Provides a comprehensive "dry run" mode to preview
- *   organizational changes without affecting the filesystem.</li>
+ *   <li><b>Intelligent Grouping:</b> Employs advanced stem analysis and prefix matching to associate
+ *   primary model weights ({@code .safetensors}) with their heterogeneous sidecar files (previews,
+ *   configs, metadata), ensuring atomic relocations of entire model "units".</li>
+ *   <li><b>Concurrent Execution:</b> Leverages Java 21 Virtual Threads to parallelize I/O-intensive
+ *   filesystem operations. This allows for near-instantaneous sorting of libraries containing
+ *   thousands of files while maintaining low memory overhead.</li>
+ *   <li><b>State Management & Undo:</b> Automatically generates a lightweight {@link UndoManifest}
+ *   after every real organization run. This manifest allows for full, bit-perfect restoration
+ *    of the previous filesystem state via a parallelized reverse-move operation.</li>
+ *   <li><b>Metadata Enrichment:</b> Integrates with {@link ModelAnalyzer} and external APIs to
+ *   fill gaps in local metadata, ensuring models are categorized correctly even when local
+ *   information is sparse.</li>
  * </ul>
  * </p>
+ *
+ * <p>This service operates as a thread-safe, stateless component (relying on local operation state),
+ * facilitating reliable use within a high-concurrency server environment.</p>
+ *
+ * @see ModelAnalyzer
+ * @see UndoManifest
  */
 public class OrganizationService {
 
@@ -53,6 +56,8 @@ public class OrganizationService {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final String UNCATEGORIZED = "Uncategorized";
     private static final int MAX_SCAN_DEPTH = 4;
+
+    public static final String UNDO_MANIFEST_FILENAME = "undo-manifest.json";
 
     private final ModelAnalyzer modelAnalyzer;
     private final CivitaiApiClient civitaiApiClient;
@@ -68,6 +73,8 @@ public class OrganizationService {
 
         ConcurrentHashMap<String, AtomicInteger> stats = new ConcurrentHashMap<>();
         CopyOnWriteArrayList<String> errors = new CopyOnWriteArrayList<>();
+        ConcurrentLinkedQueue<MoveRecord> moveLog = new ConcurrentLinkedQueue<>();
+        ConcurrentHashMap<Path, Boolean> createdDirs = new ConcurrentHashMap<>();
 
         try (Stream<Path> fileStream = isRecursive ? Files.walk(sourceDir, MAX_SCAN_DEPTH) : Files.list(sourceDir)) {
             List<Path> allFiles = fileStream
@@ -84,7 +91,8 @@ public class OrganizationService {
             List<Future<?>> futures = new ArrayList<>();
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 for (Map.Entry<String, List<Path>> entry : groupedFiles.entrySet()) {
-                    futures.add(executor.submit(() -> processGroup(entry.getKey(), entry.getValue(), targetDir, allowedSet, isDryRun, stats, errors)));
+                    futures.add(executor.submit(() ->
+                            processGroup(entry.getKey(), entry.getValue(), targetDir, allowedSet, isDryRun, stats, errors, moveLog, createdDirs)));
                 }
             }
 
@@ -97,6 +105,10 @@ public class OrganizationService {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
+            }
+
+            if (!isDryRun && !moveLog.isEmpty()) {
+                writeUndoManifest(targetDir, moveLog);
             }
 
             logger.info("Organization task completed.");
@@ -112,6 +124,65 @@ public class OrganizationService {
         } catch (IOException e) {
             throw new OrganizerException("Failed to read source directory: " + sourceDir, e);
         }
+    }
+
+    public OperationReport undoLastOrganize(Path targetDir) {
+        Path manifestPath = targetDir.resolve(UNDO_MANIFEST_FILENAME);
+
+        if (!Files.exists(manifestPath)) {
+            throw new OrganizerException("No undo manifest found in: " + targetDir + ". Nothing to undo.");
+        }
+
+        UndoManifest manifest;
+        try {
+            manifest = objectMapper.readValue(manifestPath.toFile(), UndoManifest.class);
+        } catch (IOException e) {
+            throw new OrganizerException("Failed to read undo manifest: " + e.getMessage(), e);
+        }
+
+        logger.info("Undoing sort from {}. Reversing {} file moves.", manifest.timestamp(), manifest.moveCount());
+
+        ConcurrentHashMap<String, AtomicInteger> stats = new ConcurrentHashMap<>();
+        CopyOnWriteArrayList<String> errors = new CopyOnWriteArrayList<>();
+        AtomicInteger restored = new AtomicInteger(0);
+
+        List<Future<?>> futures = new ArrayList<>(manifest.moves().size());
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (MoveRecord record : manifest.moves()) {
+                futures.add(executor.submit(() -> reverseMove(record, restored, errors)));
+            }
+        }
+
+        for (Future<?> f : futures) {
+            try {
+                f.get();
+            } catch (ExecutionException e) {
+                logger.error("Undo task failed: {}", e.getCause().getMessage(), e.getCause());
+                errors.add("Undo task failure: " + e.getCause().getMessage());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        pruneEmptyArchitectureDirs(targetDir, errors);
+
+        try {
+            Files.deleteIfExists(manifestPath);
+        } catch (IOException e) {
+            logger.warn("Could not delete undo manifest after successful undo: {}", e.getMessage());
+        }
+
+        int restoredCount = restored.get();
+        logger.info("Undo complete. Restored {} files, {} errors.", restoredCount, errors.size());
+
+        Map<String, Integer> finalStats = Map.of("Restored", restoredCount, "Errors", errors.size());
+        return new OperationReport(
+                String.format("Undo complete. %d file(s) restored to their original locations.", restoredCount),
+                finalStats, new ArrayList<>(errors), restoredCount, 0);
+    }
+
+    public boolean canUndo(Path targetDir) {
+        return Files.exists(targetDir.resolve(UNDO_MANIFEST_FILENAME));
     }
 
     public OperationReport fetchMissingMetadata(Path targetDir, boolean isRecursive, boolean isDryRun) {
@@ -158,6 +229,75 @@ public class OrganizationService {
 
         } catch (IOException e) {
             throw new OrganizerException("Failed to scan target directory: " + targetDir, e);
+        }
+    }
+
+    private void writeUndoManifest(Path targetDir, ConcurrentLinkedQueue<MoveRecord> moveLog) {
+        List<MoveRecord> moves = new ArrayList<>(moveLog);
+        UndoManifest manifest = new UndoManifest(Instant.now().toString(), moves.size(), moves);
+
+        Path manifestPath = targetDir.resolve(UNDO_MANIFEST_FILENAME);
+        Path tempPath = targetDir.resolve(UNDO_MANIFEST_FILENAME + ".tmp");
+
+        try {
+            ensureDirectoryExists(targetDir);
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(tempPath.toFile(), manifest);
+            Files.move(tempPath, manifestPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            logger.info("Undo manifest written: {} moves recorded at '{}'", moves.size(), manifestPath);
+        } catch (IOException e) {
+            logger.warn("Could not write undo manifest (undo will be unavailable): {}", e.getMessage());
+            try {
+                Files.deleteIfExists(tempPath);
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    private void reverseMove(MoveRecord record, AtomicInteger restored, CopyOnWriteArrayList<String> errors) {
+        Path src = Path.of(record.to());
+        Path dst = Path.of(record.from());
+
+        if (!Files.exists(src)) {
+            String msg = String.format("Undo skipped — file no longer exists at '%s'", src);
+            logger.warn(msg);
+            errors.add(msg);
+            return;
+        }
+
+        try {
+            ensureDirectoryExists(dst.getParent());
+            Files.move(src, dst, StandardCopyOption.REPLACE_EXISTING);
+            restored.incrementAndGet();
+            logger.debug("Restored '{}' → '{}'", src.getFileName(), dst.getParent());
+        } catch (IOException e) {
+            String msg = String.format("Failed to restore '%s': %s", src, e.getMessage());
+            logger.error(msg, e);
+            errors.add(msg);
+        }
+    }
+
+    private void pruneEmptyArchitectureDirs(Path targetDir, CopyOnWriteArrayList<String> errors) {
+        try (Stream<Path> dirs = Files.list(targetDir)) {
+            dirs.filter(Files::isDirectory)
+                    .filter(d -> !d.getFileName().toString().equals("."))
+                    .forEach(dir -> {
+                        try {
+                            if (isDirectoryEmpty(dir)) {
+                                Files.delete(dir);
+                                logger.debug("Pruned empty directory: {}", dir.getFileName());
+                            }
+                        } catch (IOException e) {
+                            logger.info("Could not prune directory '{}': {}", dir.getFileName(), e.getMessage());
+                        }
+                    });
+        } catch (IOException e) {
+            logger.warn("Could not list target directory for pruning: {}", e.getMessage());
+        }
+    }
+
+    private static boolean isDirectoryEmpty(Path dir) throws IOException {
+        try (Stream<Path> entries = Files.list(dir)) {
+            return entries.findFirst().isEmpty();
         }
     }
 
@@ -238,7 +378,8 @@ public class OrganizationService {
     }
 
     private void processGroup(String groupKey, List<Path> files, Path targetDir, Set<String> allowedSet, boolean isDryRun,
-                              ConcurrentHashMap<String, AtomicInteger> stats, CopyOnWriteArrayList<String> errors) {
+                              ConcurrentHashMap<String, AtomicInteger> stats, CopyOnWriteArrayList<String> errors,
+                              ConcurrentLinkedQueue<MoveRecord> moveLog, ConcurrentHashMap<Path, Boolean> createdDirs) {
         String baseName = Path.of(groupKey).getFileName().toString().trim();
         String dryRunPrefix = isDryRun ? "[DRY RUN] " : "";
 
@@ -257,7 +398,14 @@ public class OrganizationService {
 
             Path architectureDir = targetDir.resolve(architecture);
             if (!isDryRun) {
-                ensureDirectoryExists(architectureDir);
+                createdDirs.computeIfAbsent(architectureDir, p -> {
+                    try {
+                        Files.createDirectories(p);
+                        return Boolean.TRUE;
+                    } catch (IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
+                });
             }
 
             for (Path file : files) {
@@ -265,12 +413,15 @@ public class OrganizationService {
                 if (!file.toAbsolutePath().equals(targetPath.toAbsolutePath())) {
                     if (!isDryRun) {
                         Files.move(file, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                        moveLog.offer(new MoveRecord(
+                                file.toAbsolutePath().toString(),
+                                targetPath.toAbsolutePath().toString()
+                        ));
                     }
                 }
             }
 
             logger.info("{}{}", dryRunPrefix, String.format("Moved group '%s' (%d files) → '%s'", baseName, files.size(), architecture));
-
             stats.computeIfAbsent(architecture, k -> new AtomicInteger(0)).incrementAndGet();
 
         } catch (IOException e) {
