@@ -1,12 +1,12 @@
 package com.latent.organizer.exception;
 
 /**
- * <p>Base domain exception for the Latent Model Organizer ecosystem.</p>
+ * <p>The {@code OrganizerException} class is the base domain exception for the Latent Model Organizer
+ * ecosystem. It is a runtime exception that normalizes application-specific failure modes.</p>
  *
- * <p>This runtime exception acts as the top-level catch-all for application-specific
- * failure modes. It is used to normalize error propagation across the multi-threaded
- * service layer and the REST API handlers, ensuring that domain-specific errors
- * are clearly distinguished from general system or I/O failures.</p>
+ * <p>This exception is used to propagate domain-specific errors across the service layer and
+ * the REST API handlers, ensuring that logical failures are distinguished from general system
+ * or I/O failures for clearer error reporting and handling.</p>
  */
 public class OrganizerException extends RuntimeException {
 

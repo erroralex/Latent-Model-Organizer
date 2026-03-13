@@ -11,14 +11,24 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 /**
- * <p>Utility for cryptographic hashing operations, optimized for processing large model files.</p>
+ * <p>The {@code HashUtil} class provides utility methods for cryptographic hashing operations,
+ * specifically optimized for processing large machine learning model files. It ensures
+ * high performance and low memory overhead during SHA-256 calculation.</p>
  *
- * <p>This utility provides efficient SHA-256 calculation by utilizing buffered file reading
- * and a streaming approach to {@link java.security.MessageDigest}, minimizing memory overhead
- * even when processing multi-gigabyte files. It is primarily used to generate unique
- * identifiers for model files to match them against external databases like Civitai.</p>
+ * <p>This utility uses a buffered streaming approach to process multi-gigabyte files,
+ * generating unique identifiers used for matching models against external databases
+ * like Civitai. It is designed as a stateless, non-instantiable utility class.</p>
  *
- * <p>The class is designed as a stateless utility and is not instantiable.</p>
+ * <p>Implementation Details:
+ * <ul>
+ *   <li><b>Memory Efficiency:</b> Processes files in chunks using a fixed-size buffer
+ *   to avoid loading entire models into memory.</li>
+ *   <li><b>Cryptographic Integrity:</b> Uses the standard SHA-256 algorithm via
+ *   {@link MessageDigest}.</li>
+ *   <li><b>Hex Encoding:</b> Includes a specialized method for converting byte arrays
+ *   into lowercase hexadecimal strings.</li>
+ * </ul>
+ * </p>
  */
 public final class HashUtil {
 

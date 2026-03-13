@@ -20,7 +20,62 @@
 
 const {app, BrowserWindow, ipcMain, dialog, shell} = require('electron');
 const path = require('node:path');
-const {exec} = require('child_process');
+const {exec, spawn} = require('child_process');
+const fs = require('fs');
+
+// Reliable check for development mode
+const isDev = !app.isPackaged;
+let backendProcess = null;
+
+function getBackendPath() {
+    if (isDev) {
+        // In dev, we assume the backend is either running separately OR
+        // we can try to run the jar if it was built.
+        // For simplicity in this project's context (per CONTRIBUTING.md),
+        // we expect the dev to run the backend in IntelliJ.
+        console.log('Development mode detected. Assuming backend is running externally or will be started manually.');
+        return null;
+    }
+    
+    // In production, look for the bundled JRE and JAR
+    // structure: resources/app.asar/../../runtime/bin/java (or java.exe)
+    // jar: resources/app.asar/../../runtime/app/backend.jar
+    
+    const rootDir = path.join(process.resourcesPath, '..', 'runtime');
+    const binName = process.platform === 'win32' ? 'java.exe' : 'java';
+    const javaPath = path.join(rootDir, 'bin', binName);
+    const jarPath = path.join(rootDir, 'app', 'backend.jar');
+    
+    return { javaPath, jarPath };
+}
+
+function startBackend() {
+    const paths = getBackendPath();
+    if (!paths) return;
+
+    if (!fs.existsSync(paths.javaPath)) {
+        console.error(`JRE not found at: ${paths.javaPath}`);
+        return;
+    }
+    if (!fs.existsSync(paths.jarPath)) {
+        console.error(`Backend JAR not found at: ${paths.jarPath}`);
+        return;
+    }
+
+    console.log('Starting Java backend...');
+    backendProcess = spawn(paths.javaPath, ['-jar', paths.jarPath], {
+        stdio: 'ignore', // Detach stdio or redirect to log file if needed
+        windowsHide: true // Hide console window on Windows
+    });
+
+    backendProcess.on('error', (err) => {
+        console.error('Failed to start backend:', err);
+    });
+    
+    backendProcess.on('exit', (code) => {
+        console.log(`Backend exited with code ${code}`);
+    });
+}
 
 function createWindow() {
     const mainWindow = new BrowserWindow({
@@ -35,10 +90,23 @@ function createWindow() {
         },
     });
 
-    mainWindow.loadURL('http://localhost:5173');
+    if (isDev) {
+        // In dev, wait a sec for Vite to be ready if running concurrently,
+        // or just load localhost.
+        console.log('Loading development URL...');
+        mainWindow.loadURL('http://localhost:5173');
+        // mainWindow.webContents.openDevTools(); // Optional: auto-open devtools
+    } else {
+        // In production, load the built Vue app
+        const indexPath = path.join(__dirname, '../frontend/dist/index.html');
+        mainWindow.loadFile(indexPath).catch(e => {
+             console.error('Failed to load index.html:', e);
+        });
+    }
 }
 
 app.whenReady().then(() => {
+    startBackend();
 
     ipcMain.handle('dialog:selectFolder', async () => {
         const result = await dialog.showOpenDialog({properties: ['openDirectory']});
@@ -73,29 +141,34 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', async () => {
-    console.log('Window closed. Initiating total stack shutdown…');
+    console.log('Window closed. Initiating shutdown…');
 
-    try {
-        await fetch('http://localhost:8080/api/shutdown', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-        });
-        console.log('Java backend shutdown signal sent.');
-    } catch (err) {
-        console.log('Java backend already closed or unreachable:', err.message);
+    // 1. Kill backend gracefully if running (Production only)
+    if (backendProcess) {
+        try {
+            await fetch('http://localhost:8080/api/shutdown', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+            });
+        } catch (e) {
+            backendProcess.kill(); 
+        }
+    } else if (isDev) {
+        // In dev, strictly optional to try killing the external backend
+        // We usually leave it running for faster dev cycles, but here we try to be clean.
+        try {
+            await fetch('http://localhost:8080/api/shutdown', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+            });
+        } catch (ignored) {}
     }
 
-    const vitePort = 5173;
-    const killCmd = process.platform === 'win32'
-        ? `for /f "tokens=5" %a in ('netstat -aon ^| find ":${vitePort}" ^| find "LISTENING"') do taskkill /f /pid %a`
-        : `lsof -ti:${vitePort} | xargs kill -9`;
-
-    exec(killCmd, (err) => {
-        if (!err) console.log('Vite process terminated.');
+    // 2. Kill Vite (Dev only)
+    if (isDev) {
+        // Just quit the app, Vite is usually managed by the terminal that ran `npm run dev`
         app.quit();
-    });
-
-    setTimeout(() => {
+    } else {
         app.quit();
-    }, 1500);
+    }
 });

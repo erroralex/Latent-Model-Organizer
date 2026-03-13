@@ -11,21 +11,21 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * <p>A high-concurrency Logback appender for Server-Sent Events (SSE) broadcasting.</p>
+ * <p>The {@code SseLogAppender} is a high-concurrency Logback appender designed for Server-Sent Events (SSE)
+ * broadcasting. It captures system logging events and propagates them to connected clients in real-time.</p>
  *
- * <p>The {@code SseLogAppender} intercepts internal logging events and dispatches them to a collection
- * of registered web clients. It implements a non-blocking broadcasting strategy by utilizing a
- * thread-safe {@link CopyOnWriteArrayList} for client management, ensuring stability even under
- * high connection churn.</p>
+ * <p>This component acts as a bridge between the application's logging infrastructure and the web interface,
+ * allowing developers to monitor backend activity directly from the frontend. It maintains a
+ * thread-safe registry of active client writers and handles broadcasting with defensive error
+ * management to prune stale connections.</p>
  *
- * <p>Key features:
+ * <p>Architectural Features:
  * <ul>
- *     <li><b>Real-Time Propagation:</b> Formats and flushes log strings immediately upon arrival
- *     to minimize perceived latency in the frontend console.</li>
- *     <li><b>Defensive Client Management:</b> Automatically detects and prunes disconnected or
- *     stale clients by catching I/O exceptions during the write cycle.</li>
- *     <li><b>Concise Formatting:</b> Aggressively simplifies timestamps and logger names to
- *     optimize horizontal space in terminal-like UI components.</li>
+ *   <li><b>Concurrent Registry:</b> Uses {@link CopyOnWriteArrayList} for thread-safe management
+ *   of client {@link PrintWriter} instances.</li>
+ *   <li><b>Log Formatting:</b> Applies custom formatting to logging events for optimized readability
+ *   within a browser-based console.</li>
+ *   <li><b>Automatic Cleanup:</b> Detects and removes disconnected clients during the broadcast cycle.</li>
  * </ul>
  * </p>
  */

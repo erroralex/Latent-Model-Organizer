@@ -24,11 +24,22 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 
 /**
- * <p>The main entry point for the Latent Model Organizer Backend application.</p>
+ * <p>The {@code OrganizerApplication} serves as the primary entry point and orchestration layer for the
+ * Latent Model Organizer Backend. It initializes the core services and manages a lightweight
+ * {@link HttpServer} to handle RESTful interactions.</p>
  *
- * <p>This application serves as a lightweight orchestration engine for managing and organizing large-scale
- * machine learning model collections. It exposes a specialized REST API that facilitates automatic
- * architecture identification, multi-pass file grouping, and real-time activity monitoring.</p>
+ * <p>The system is designed for high-performance machine learning model management, providing endpoints
+ * for model organization, metadata retrieval, and real-time log streaming via SSE. It leverages
+ * Java 21 Virtual Threads to handle concurrent API requests efficiently without taxing system resources.</p>
+ *
+ * <p>Key Endpoints:
+ * <ul>
+ *   <li>{@code /api/organize}: Triggers the model classification and movement logic.</li>
+ *   <li>{@code /api/fetch}: Initiates metadata discovery from external sources like Civitai.</li>
+ *   <li>{@code /api/logs}: Provides a Server-Sent Events stream of system logs.</li>
+ *   <li>{@code /api/shutdown}: Gracefully terminates the application service.</li>
+ * </ul>
+ * </p>
  */
 public class OrganizerApplication {
 
@@ -42,7 +53,7 @@ public class OrganizerApplication {
             OrganizationService organizationService = new OrganizationService(modelAnalyzer);
 
             HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
-            
+
             server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
             server.createContext("/api/organize", new OrganizeHandler(organizationService));
@@ -90,11 +101,11 @@ public class OrganizerApplication {
                 }
 
                 OperationReport report = organizationService.organizeModels(
-                    Paths.get(request.sourceDirectory()), 
-                    Paths.get(request.targetDirectory()), 
-                    request.allowedArchitectures(),
-                    request.isRecursive(),
-                    request.isDryRun()
+                        Paths.get(request.sourceDirectory()),
+                        Paths.get(request.targetDirectory()),
+                        request.allowedArchitectures(),
+                        request.isRecursive(),
+                        request.isDryRun()
                 );
                 sendJson(exchange, 200, report);
             } catch (OrganizerException e) {
@@ -137,9 +148,9 @@ public class OrganizerApplication {
                 }
 
                 OperationReport report = organizationService.fetchMissingMetadata(
-                    Paths.get(request.targetDirectory()),
-                    request.isRecursive(),
-                    request.isDryRun()
+                        Paths.get(request.targetDirectory()),
+                        request.isRecursive(),
+                        request.isDryRun()
                 );
                 sendJson(exchange, 200, report);
             } catch (OrganizerException e) {
@@ -173,11 +184,12 @@ public class OrganizerApplication {
 
             logger.info("Received shutdown signal.");
             sendJson(exchange, 200, Map.of("status", "shutting down"));
-            
+
             Thread.ofVirtual().start(() -> {
                 try {
                     Thread.sleep(100);
-                } catch (InterruptedException ignored) {}
+                } catch (InterruptedException ignored) {
+                }
                 logger.info("Stopping HTTP Server...");
                 server.stop(0);
                 System.exit(0);

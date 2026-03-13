@@ -1,68 +1,84 @@
 /**
- * Base Styles
- * Description: Global resets, body styles, and core utility classes.
+ * Base Styles & Resets
+ * Description: Global CSS variables, resets, and core typography.
  */
 
-body {
+:root {
+    /* Structural Fallbacks (overridden by themes) */
+    --glass-blur: blur(12px);
+    --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --border-light: rgba(255, 255, 255, 0.1);
+    --bg-header: rgba(15, 15, 15, 0.6);
+    --bg-panel: rgba(20, 20, 20, 0.4);
+
+    /* Functional Colors */
+    --status-success: #4ade80;
+    --status-warning: #fbbf24;
+    --status-danger: #f87171;
+}
+
+/* --- Global Resets --- */
+*, *::before, *::after {
     margin: 0;
-    font-family: var(--font-family, 'Inter', sans-serif);
-    background-color: var(--bg-app);
-    background-image: var(--bg-app-image);
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* --- Body & Layout --- */
+body {
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    background-color: var(--bg-app, #0f0f0f);
+    background-image: var(--bg-app-image, none);
+    background-size: cover;
+    background-position: center;
     background-attachment: fixed;
-    color: var(--text-primary);
+    color: var(--text-primary, #ffffff);
+    font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow: hidden;
-}
-
-/* --- Global Scrollbar Styling --- */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--scrollbar-track);
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-thumb-hover);
 }
 
 /* --- Typography Utilities --- */
-.text-primary { color: var(--text-primary); }
-.text-secondary { color: var(--text-secondary); }
-.text-muted { color: var(--text-muted); }
-
 .text-gradient {
-    background: var(--grad-text);
+    background: var(--grad-text, linear-gradient(90deg, #fff, #ccc));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     font-weight: 800;
 }
 
-/* --- Glass Effects --- */
-.glass-panel {
-    background: var(--bg-panel);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--border-light);
-    box-shadow: var(--shadow-panel);
-    position: relative;
-    overflow: hidden;
+/* --- Custom Scrollbars --- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
 }
 
-.glass-panel::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--app-glass-gloss);
-    pointer-events: none;
-    z-index: 1;
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Firefox Scrollbar Support */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* --- Root App Container (Prevent Layout Collapse) --- */
+#app {
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
