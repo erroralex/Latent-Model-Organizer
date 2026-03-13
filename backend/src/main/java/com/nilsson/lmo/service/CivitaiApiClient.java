@@ -16,6 +16,8 @@ import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 /**
  * <p>The {@code CivitaiApiClient} is a high-performance HTTP client specifically engineered for interacting
  * with the Civitai REST API. It leverages Java 21 {@link HttpClient} and Virtual Threads
@@ -152,6 +154,40 @@ public class CivitaiApiClient implements AutoCloseable {
             logger.warn("Preview image download interrupted: {}", imageUrl);
             deleteQuietly(destination);
         }
+    }
+
+    /**
+     * Downloads the first preview image from a Civitai API response node if no
+     * preview file already exists for this model. Replaces the cross-package
+     * dependency on {@code OrganizationService.resolvePreviewExtension()}.
+     *
+     * @param rootNode
+     *         the parsed Civitai API JSON response
+     * @param modelPath
+     *         path to the {@code .safetensors} file (used to resolve siblings)
+     * @param baseName
+     *         the model filename without extension
+     */
+    public void downloadPreviewImageIfAbsent(JsonNode rootNode, Path modelPath, String baseName) {
+        JsonNode images = rootNode.path("images");
+        if (!images.isArray() || images.isEmpty()) return;
+
+        String imageUrl = images.get(0).path("url").asText(null);
+        if (imageUrl == null || imageUrl.isBlank()) return;
+
+        String extension = resolvePreviewExtension(imageUrl);
+        Path imagePath = modelPath.resolveSibling(baseName.trim() + extension);
+
+        if (Files.exists(imagePath)) return;
+
+        downloadPreviewImage(imageUrl, imagePath);
+    }
+
+    private static String resolvePreviewExtension(String imageUrl) {
+        String lower = imageUrl.toLowerCase();
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return ".preview.jpeg";
+        if (lower.endsWith(".webp")) return ".preview.webp";
+        return ".preview.png";
     }
 
     public String hashWithTiming(Path modelPath) throws IOException {

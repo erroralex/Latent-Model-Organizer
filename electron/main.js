@@ -36,16 +36,16 @@ function getBackendPath() {
         console.log('Development mode detected. Assuming backend is running externally or will be started manually.');
         return null;
     }
-    
+
     // In production, look for the bundled JRE and JAR
     // structure: resources/app.asar/../../runtime/bin/java (or java.exe)
     // jar: resources/app.asar/../../runtime/app/backend.jar
-    
+
     const rootDir = path.join(process.resourcesPath, '..', 'runtime');
     const binName = process.platform === 'win32' ? 'java.exe' : 'java';
     const javaPath = path.join(rootDir, 'bin', binName);
     const jarPath = path.join(rootDir, 'app', 'backend.jar');
-    
+
     return { javaPath, jarPath };
 }
 
@@ -71,7 +71,7 @@ function startBackend() {
     backendProcess.on('error', (err) => {
         console.error('Failed to start backend:', err);
     });
-    
+
     backendProcess.on('exit', (code) => {
         console.log(`Backend exited with code ${code}`);
     });
@@ -100,7 +100,7 @@ function createWindow() {
         // In production, load the built Vue app
         const indexPath = path.join(__dirname, '../frontend/dist/index.html');
         mainWindow.loadFile(indexPath).catch(e => {
-             console.error('Failed to load index.html:', e);
+            console.error('Failed to load index.html:', e);
         });
     }
 }
@@ -111,6 +111,12 @@ app.whenReady().then(() => {
     ipcMain.handle('dialog:selectFolder', async () => {
         const result = await dialog.showOpenDialog({properties: ['openDirectory']});
         return result.canceled ? null : result.filePaths[0];
+    });
+
+    ipcMain.handle('api:undoLastOrganization', async () => {
+        const res = await fetch('http://localhost:8080/api/undo', { method: 'POST' });
+        if (!res.ok) throw new Error(`Undo failed with status ${res.status}`);
+        return res.json();
     });
 
     ipcMain.on('shell:openExternal', (_event, url) => {
@@ -131,7 +137,7 @@ app.whenReady().then(() => {
 
     // Modified Handler: Force app quit instead of just closing window
     ipcMain.on('window:close', (event) => {
-         app.quit();
+        app.quit();
     });
 
     ipcMain.on('app:quit', (event) => {
@@ -148,7 +154,7 @@ app.whenReady().then(() => {
 // Robust Shutdown Logic
 app.on('before-quit', async (event) => {
     console.log('App quitting. Initiating cleanup...');
-    
+
     // 1. Kill backend gracefully if running (Production only)
     if (backendProcess) {
         try {
@@ -159,9 +165,9 @@ app.on('before-quit', async (event) => {
             });
         } catch (e) {
             // Fallback to force kill
-            backendProcess.kill(); 
+            backendProcess.kill();
         }
-    } 
+    }
     // In dev, try to signal the backend too if it's listening
     else if (isDev) {
         try {
@@ -185,13 +191,13 @@ app.on('will-quit', () => {
         try {
             console.log('Attempting to force kill Vite server on port 5173...');
             const stdout = execSync('netstat -ano | findstr :5173', { encoding: 'utf-8' });
-            
+
             if (stdout) {
                 const lines = stdout.trim().split('\n');
                 lines.forEach(line => {
                     if (line.includes('LISTENING')) {
                         const parts = line.trim().split(/\s+/);
-                        const pid = parts[parts.length - 1]; 
+                        const pid = parts[parts.length - 1];
                         if (pid && !isNaN(pid)) {
                             console.log(`Killing Vite process with PID: ${pid}`);
                             try {

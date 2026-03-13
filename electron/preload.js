@@ -3,13 +3,13 @@
  *
  * This script executes in a privileged context with limited access to Node.js APIs,
  * enabling secure communication between the untrusted web frontend and the trusted
- * desktop environment. It uses contextBridge and contextIsolation to prevent 
+ * desktop environment. It uses contextBridge and contextIsolation to prevent
  * the renderer from having direct access to native system calls.
  *
  * Exposed APIs include:
  * - electronAPI: Provides methods for native features like directory selection dialogs
  *   and opening external URLs in the default browser.
- * - windowAPI: Provides methods for controlling the application window state 
+ * - windowAPI: Provides methods for controlling the application window state
  *   (minimize, maximize, close) from the custom frontend title bar.
  */
 
@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
     openExternal: (url) => ipcRenderer.send('shell:openExternal', url),
     closeApp: () => ipcRenderer.send('app:quit'),
+    undoLastOrganization: () => ipcRenderer.invoke('api:undoLastOrganization'),
 });
 
 contextBridge.exposeInMainWorld('windowAPI', {

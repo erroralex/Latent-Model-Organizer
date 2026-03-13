@@ -20,11 +20,12 @@ import InfoModal from '../components/InfoModal.vue';
 
 const props = defineProps({
   isProcessing: { type: Boolean, default: false },
-  isRecursive: { type: Boolean, default: true },
-  isDryRun: { type: Boolean, default: false },
+  isRecursive:  { type: Boolean, default: true },
+  isDryRun:     { type: Boolean, default: false },
+  canUndo:      { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['start-organize', 'update:isRecursive', 'update:isDryRun', 'open-info']);
+const emit = defineEmits(['start-organize', 'update:isRecursive', 'update:isDryRun', 'open-info', 'undo']);
 
 const lsGet = (k, fb) => { try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : fb; } catch { return fb; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -162,6 +163,16 @@ const handleExecute = () => {
     <button class="primary-btn" @click="handleExecute" :disabled="isProcessing">
       <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-sort-alt'"></i>
       {{ isProcessing ? 'Organizing…' : 'Start Organization' }}
+    </button>
+
+    <button
+        class="secondary-btn"
+        @click="emit('undo')"
+        :disabled="isProcessing || !canUndo"
+        title="Move all files from the last real sort back to their original locations. Not available after dry runs."
+    >
+      <i class="pi pi-undo"></i>
+      Undo Last Sort
     </button>
 
     <InfoModal v-if="showInfo" title="Model Organizer Info" @close="showInfo = false">

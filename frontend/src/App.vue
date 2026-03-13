@@ -44,6 +44,7 @@ const statusMessage   = ref('Ready.');
 const isProcessing    = ref(false);
 const showReportModal = ref(false);
 const operationReport = ref(null);
+const canUndo         = ref(false);
 
 const API_BASE = window.location?.hostname === 'localhost' ? '' : 'http://localhost:8080';
 
@@ -57,6 +58,7 @@ const callApi = async (endpoint, body, msg) => {
     statusMessage.value  = '✅ ' + (data.message || 'Done!');
     operationReport.value = data;
     showReportModal.value  = true;
+    return data;
   } catch (err) {
     statusMessage.value = '❌ ' + err.message;
   } finally {
@@ -64,10 +66,31 @@ const callApi = async (endpoint, body, msg) => {
   }
 };
 
-const handleStartOrganize = ({ sourceDirectory, targetDirectory, allowedArchitectures }) => {
+const handleStartOrganize = async ({ sourceDirectory, targetDirectory, allowedArchitectures }) => {
   if (!sourceDirectory || !targetDirectory) { statusMessage.value = '⚠️ Please select both source and target directories.'; return; }
   if (!allowedArchitectures.length)         { statusMessage.value = '⚠️ Please select at least one architecture.'; return; }
-  callApi('/api/organize', { sourceDirectory, targetDirectory, allowedArchitectures, isRecursive: isRecursive.value, isDryRun: isDryRun.value }, '⏳ Scanning and organizing models…');
+  canUndo.value = false;
+  const data = await callApi('/api/organize', { sourceDirectory, targetDirectory, allowedArchitectures, isRecursive: isRecursive.value, isDryRun: isDryRun.value }, '⏳ Scanning and organizing models…');
+  // Enable undo only after a real (non-dry-run) sort that moved at least one file.
+  if (data && !isDryRun.value && data.totalProcessed > 0) canUndo.value = true;
+};
+
+const handleUndo = async () => {
+  isProcessing.value = true;
+  statusMessage.value = '⏳ Undoing last sort…';
+  try {
+    const res  = await fetch(`${API_BASE}/api/undo`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || `Server error ${res.status}`);
+    statusMessage.value   = '✅ ' + (data.message || 'Undo complete.');
+    operationReport.value = data;
+    showReportModal.value = true;
+    canUndo.value         = false;
+  } catch (err) {
+    statusMessage.value = '❌ ' + err.message;
+  } finally {
+    isProcessing.value = false;
+  }
 };
 
 const handleStartFetch = ({ targetDirectory }) => {
@@ -114,14 +137,14 @@ const closeReport = () => { showReportModal.value = false; operationReport.value
 
     <div class="app-body">
       <Sidebar
-        :activeTab="activeTab"
-        :showSettings="showSettings"
-        :consoleOpen="consoleOpen"
-        :isProcessing="isProcessing"
-        :currentTheme="currentTheme"
-        @update:activeTab="v => activeTab = v"
-        @update:showSettings="v => showSettings = v"
-        @update:consoleOpen="v => consoleOpen = v"
+          :activeTab="activeTab"
+          :showSettings="showSettings"
+          :consoleOpen="consoleOpen"
+          :isProcessing="isProcessing"
+          :currentTheme="currentTheme"
+          @update:activeTab="v => activeTab = v"
+          @update:showSettings="v => showSettings = v"
+          @update:consoleOpen="v => consoleOpen = v"
       />
 
       <main class="app-main">
@@ -129,23 +152,25 @@ const closeReport = () => { showReportModal.value = false; operationReport.value
           <div class="content-container">
             <div class="glass-panel main-card">
               <SorterView
-                v-if="activeTab === 'sort'"
-                :isProcessing="isProcessing"
-                :isRecursive="isRecursive"
-                :isDryRun="isDryRun"
-                @update:isRecursive="v => isRecursive = v"
-                @update:isDryRun="v => isDryRun = v"
-                @start-organize="handleStartOrganize"
+                  v-if="activeTab === 'sort'"
+                  :isProcessing="isProcessing"
+                  :isRecursive="isRecursive"
+                  :isDryRun="isDryRun"
+                  :canUndo="canUndo"
+                  @update:isRecursive="v => isRecursive = v"
+                  @update:isDryRun="v => isDryRun = v"
+                  @start-organize="handleStartOrganize"
+                  @undo="handleUndo"
               />
 
               <FetcherView
-                v-else
-                :isProcessing="isProcessing"
-                :isRecursive="isRecursive"
-                :isDryRun="isDryRun"
-                @update:isRecursive="v => isRecursive = v"
-                @update:isDryRun="v => isDryRun = v"
-                @start-fetch="handleStartFetch"
+                  v-else
+                  :isProcessing="isProcessing"
+                  :isRecursive="isRecursive"
+                  :isDryRun="isDryRun"
+                  @update:isRecursive="v => isRecursive = v"
+                  @update:isDryRun="v => isDryRun = v"
+                  @start-fetch="handleStartFetch"
               />
             </div>
 
@@ -172,22 +197,22 @@ const closeReport = () => { showReportModal.value = false; operationReport.value
     </div>
 
     <SummaryModal
-      v-if="showReportModal && operationReport"
-      :report="operationReport"
-      :isDryRun="isDryRun"
-      @close="closeReport"
+        v-if="showReportModal && operationReport"
+        :report="operationReport"
+        :isDryRun="isDryRun"
+        @close="closeReport"
     />
 
     <SettingsModal
-      v-if="showSettings"
-      :currentTheme="currentTheme"
-      :availableThemes="availableThemes"
-      :isRecursive="isRecursive"
-      :isDryRun="isDryRun"
-      @applyTheme="applyTheme"
-      @update:isRecursive="v => isRecursive = v"
-      @update:isDryRun="v => isDryRun = v"
-      @close="showSettings = false"
+        v-if="showSettings"
+        :currentTheme="currentTheme"
+        :availableThemes="availableThemes"
+        :isRecursive="isRecursive"
+        :isDryRun="isDryRun"
+        @applyTheme="applyTheme"
+        @update:isRecursive="v => isRecursive = v"
+        @update:isDryRun="v => isDryRun = v"
+        @close="showSettings = false"
     />
   </div>
 </template>
