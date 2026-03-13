@@ -1,0 +1,91 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger only when a tag starting with 'v' is pushed (e.g., v1.0.2)
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build Backend (Java HttpServer)
+        working-directory: ./backend
+        run: mvn clean package -DskipTests
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Frontend (Vue)
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Install Electron Dependencies
+        working-directory: ./electron
+        run: npm ci
+
+      # Prepare the runtime folder structure expected by electron-builder
+      - name: Prepare Runtime Directory
+        shell: bash
+        run: |
+          mkdir -p electron/runtime/app
+          mkdir -p electron/runtime/bin
+          # Ensure backend.jar exists - the POM defines the final name
+          # We'll use a wildcard to be safe or ensure maven names it specifically
+          cp backend/target/backend-*.jar electron/runtime/app/backend.jar
+
+      # Bundle a custom JRE using jlink
+      - name: Create Custom JRE
+        shell: bash
+        run: |
+          "$JAVA_HOME/bin/jlink" \
+            --add-modules java.base,java.net.http,java.logging,jdk.crypto.ec \
+            --output electron/runtime/jre \
+            --strip-debug \
+            --no-man-pages \
+            --no-header-files \
+            --compress=2
+
+      - name: Build Electron App
+        working-directory: ./electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist
+
+      - name: Upload Artifacts
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            electron/dist/*.exe
+            electron/dist/*.AppImage
+            electron/dist/*.dmg
+            electron/dist/*.zip
+            electron/dist/*.deb
+            electron/dist/*.rpm

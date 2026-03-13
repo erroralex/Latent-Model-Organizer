@@ -19,28 +19,24 @@ import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 
 /**
- * <p>Advanced model analysis engine for identifying neural network architectures and metadata.</p>
+ * <p>The {@code ModelAnalyzer} is an advanced analysis engine designed to identify the neural network
+ * architecture and metadata of machine learning model files. It uses a tiered heuristic approach
+ * to balance performance, local privacy, and metadata accuracy.</p>
  *
- * <p>The {@code ModelAnalyzer} employs a multi-tiered heuristic approach to identify models,
- * prioritizing performance and local privacy before falling back to network-based lookups.
- * The analysis pipeline consists of the following stages:
+ * <p>Analysis Pipeline Stages:
  * <ol>
- *     <li><b>Sidecar Inspection:</b> Checks for existing {@code .civitai.info} files which provide
- *     authoritative metadata without additional computation.</li>
- *     <li><b>Header Parsing:</b> Directly reads the JSON header of {@code .safetensors} files using
- *     memory-mapped I/O (FileChannel). This is extremely efficient as it only reads the first
- *     few kilobytes of multi-gigabyte files.</li>
- *     <li><b>Filename Heuristics:</b> Analyzes the filename for known architectural keywords
- *     (e.g., "pony", "flux", "zit"). This acts as a Tier 3 fallback when metadata is missing
- *     but naming conventions are present.</li>
- *     <li><b>API Fallback:</b> Computes a SHA-256 hash of the model and queries the Civitai API.
- *     Upon a successful match, it persists the metadata locally for future use and downloads
- *     available preview images.</li>
+ *   <li><b>Sidecar Inspection:</b> Reads existing {@code .civitai.info} files for authoritative metadata.</li>
+ *   <li><b>Header Parsing:</b> Efficiently extracts metadata from {@code .safetensors} file headers using
+ *   memory-mapped I/O.</li>
+ *   <li><b>Filename Heuristics:</b> Matches filenames against known architectural patterns and keywords.</li>
+ *   <li><b>External API Lookup:</b> Computes file hashes and queries the Civitai API as a final fallback,
+ *   caching results locally for future sessions.</li>
  * </ol>
  * </p>
  *
- * <p>The analyzer includes sophisticated mapping logic to categorize raw metadata strings into
- * clean architectural buckets like "SDXL", "Flux", "Z Image Turbo", and "Illustrious".</p>
+ * <p>This class handles the complexity of mapping various metadata formats into a unified
+ * set of architectural categories (e.g., SDXL, Flux, Pony), facilitating consistent organization
+ * across large model libraries.</p>
  */
 public class ModelAnalyzer {
 

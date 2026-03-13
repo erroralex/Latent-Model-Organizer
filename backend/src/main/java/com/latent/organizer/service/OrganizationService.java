@@ -25,25 +25,25 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * <p>The central orchestration service for organizing model files based on identified architectures.</p>
+ * <p>The {@code OrganizationService} is the central orchestration layer for managing, classifying,
+ * and relocating machine learning model files. It implements a sophisticated multi-pass grouping
+ * engine designed to handle complex model structures and inconsistent naming conventions.</p>
  *
- * <p>This service implements a sophisticated multi-pass grouping and organization engine. It is designed
- * to manage complex model relationships where weights, configurations, and previews may follow inconsistent
- * naming conventions. The service uses a combination of prefix matching and common-root analysis
- * to ensure related files are never orphaned during the movement process.</p>
+ * <p>This service coordinates between the {@link ModelAnalyzer} for architectural identification
+ * and the {@link CivitaiApiClient} for external metadata enrichment. It leverages Java 21
+ * Virtual Threads to parallelize I/O-intensive file operations and network requests, ensuring
+ * high throughput during large-scale library reorganizations.</p>
  *
- * <p>Engineering considerations:
+ * <p>Key Capabilities:
  * <ul>
- *     <li><b>Prefix-Matching Engine:</b> Anchors groups on discovered {@code .safetensors} files,
- *     using defensive longest-stem sorting to prevent overlapping group collisions.</li>
- *     <li><b>Recursive Tree Walking:</b> Scans the entire source directory tree, allowing for
- *     re-organization of previously sorted or nested collections.</li>
- *     <li><b>Virtual Thread Concurrency:</b> Offloads heavy I/O operations (file movement, API lookups)
- *     to Java 21's Virtual Threads, maintaining high throughput without blocking system resources.</li>
- *     <li><b>Atomic Movements:</b> Ensures file integrity by using atomic move operations where supported
- *     by the underlying file system.</li>
- *     <li><b>Dry Run Capability:</b> Supports non-destructive simulation modes for testing configuration
- *     changes before actual file system modification.</li>
+ *   <li><b>Intelligent Grouping:</b> Associates weights, configs, and previews using prefix matching
+ *   and stem analysis to ensure atomic file movements.</li>
+ *   <li><b>Scalable I/O:</b> Uses Virtual Threads for concurrent processing of model groups,
+ *   minimizing execution time for thousands of files.</li>
+ *   <li><b>Recursive Discovery:</b> Scans directory trees with configurable depth to find and
+ *   re-organize nested collections.</li>
+ *   <li><b>Non-Destructive Simulation:</b> Provides a comprehensive "dry run" mode to preview
+ *   organizational changes without affecting the filesystem.</li>
  * </ul>
  * </p>
  */
@@ -87,9 +87,11 @@ public class OrganizationService {
                     futures.add(executor.submit(() -> processGroup(entry.getKey(), entry.getValue(), targetDir, allowedSet, isDryRun, stats, errors)));
                 }
             }
-            
+
             for (Future<?> f : futures) {
-                try { f.get(); } catch (ExecutionException e) {
+                try {
+                    f.get();
+                } catch (ExecutionException e) {
                     logger.error("Task failed unexpectedly: {}", e.getCause().getMessage(), e.getCause());
                     errors.add("Task failure: " + e.getCause().getMessage());
                 } catch (InterruptedException e) {
@@ -135,7 +137,9 @@ public class OrganizationService {
                 }
             }
             for (Future<?> f : fetchFutures) {
-                try { f.get(); } catch (ExecutionException e) {
+                try {
+                    f.get();
+                } catch (ExecutionException e) {
                     logger.error("Fetch task failed unexpectedly: {}", e.getCause().getMessage(), e.getCause());
                     errors.add("Fetch task failure: " + e.getCause().getMessage());
                 } catch (InterruptedException e) {

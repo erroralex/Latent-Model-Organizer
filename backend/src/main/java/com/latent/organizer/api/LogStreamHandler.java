@@ -11,22 +11,23 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 
 /**
- * <p>Server-Sent Events (SSE) gateway for real-time log propagation.</p>
+ * <p>The {@code LogStreamHandler} implements a Server-Sent Events (SSE) gateway for real-time log propagation
+ * from the backend to connected clients. It manages persistent HTTP connections and facilitates
+ * asynchronous event streaming.</p>
  *
- * <p>This handler manages the persistent lifecycle of log streaming connections. It upgrades standard
- * HTTP requests to the SSE protocol by configuring chunked transfer encoding and mandatory headers.
- * The handler integrates with the {@link SseLogAppender} to bridge internal system events to
- * external frontend subscribers.</p>
+ * <p>This handler transforms standard HTTP requests into long-lived event streams by setting appropriate
+ * headers and leveraging {@link SseLogAppender} for message broadcasting. It is designed to run
+ * within a Virtual Thread environment to support a high number of concurrent monitoring sessions
+ * with minimal overhead.</p>
  *
- * <p>Engineering considerations:
+ * <p>Implementation Details:
  * <ul>
- *     <li><b>Indefinite Lifecycle:</b> Utilizes {@link CountDownLatch#await()} to sustain the connection context
- *     indefinitely, ensuring the worker thread (Virtual Thread) remains allocated to this stream until
- *     the client terminates the socket.</li>
- *     <li><b>Resource Sanitization:</b> Guarantees unregistration of clients from the broadcaster list
- *     upon disconnection or interruption, preventing memory leaks and stale references.</li>
- *     <li><b>Encoding Safety:</b> Enforces UTF-8 character encoding for consistent log rendering across
- *     different client platforms.</li>
+ *   <li><b>Connection Persistence:</b> Uses {@link CountDownLatch} to maintain the connection lifecycle
+ *   until client disconnection.</li>
+ *   <li><b>Resource Management:</b> Automatically registers and unregisters clients in the
+ *   {@link SseLogAppender} registry to ensure memory safety.</li>
+ *   <li><b>Protocol Compliance:</b> Adheres to the {@code text/event-stream} specification, including
+ *   CORS and cache-control configurations.</li>
  * </ul>
  * </p>
  */

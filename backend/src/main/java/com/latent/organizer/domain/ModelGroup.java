@@ -4,22 +4,20 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * <p>A data carrier representing a logical grouping of related model files.</p>
+ * <p>The {@code ModelGroup} record is a data carrier representing a logical grouping of related model
+ * files. It identifies a primary model file and its associated sidecar files (e.g., config,
+ * preview, metadata) that share a common identity.</p>
  *
- * <p>In the context of latent diffusion models, a single model often consists of multiple
- * files (e.g., the primary weights, a configuration file, a preview image, and potentially
- * metadata sidecars). This record groups these associated files under a common base name
- * and identifies their shared neural network architecture (e.g., "SDXL", "SD 1.5").</p>
- *
- * <p>This grouping is used during the organization process to ensure that all related
- * components of a model are moved together to the appropriate destination directory.</p>
+ * <p>This record acts as the fundamental unit of organization within the system, facilitating
+ * atomic operations on complex model structures. It links a specific neural network architecture
+ * (e.g., SDXL, SD 1.5) to a set of absolute file paths for synchronized movement or classification.</p>
  *
  * @param baseName
- *         The shared filename prefix (excluding extensions) common to all files in the group.
+ *         The shared filename prefix common to all files in the group.
  * @param architecture
- *         The specific model architecture identified through analysis or metadata lookup.
+ *         The identified neural network architecture of the model group.
  * @param associatedFiles
- *         An immutable list of absolute {@link java.nio.file.Path}s representing the files in this group.
+ *         An immutable list of absolute {@link java.nio.file.Path}s belonging to this group.
  */
 public record ModelGroup(
         String baseName,
