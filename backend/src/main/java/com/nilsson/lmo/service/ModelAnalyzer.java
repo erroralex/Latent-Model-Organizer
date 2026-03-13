@@ -19,24 +19,29 @@ import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 
 /**
- * <p>The {@code ModelAnalyzer} is an advanced analysis engine designed to identify the neural network
- * architecture and metadata of machine learning model files. It uses a tiered heuristic approach
- * to balance performance, local privacy, and metadata accuracy.</p>
+ * <p>The {@code ModelAnalyzer} is a specialized engine designed to identify the neural network
+ * architecture and associated metadata of machine learning model files. It implements a multi-stage
+ * heuristic pipeline that prioritizes local data before falling back to external API lookups.</p>
  *
  * <p>Analysis Pipeline Stages:
  * <ol>
- *   <li><b>Sidecar Inspection:</b> Reads existing {@code .civitai.info} files for authoritative metadata.</li>
- *   <li><b>Header Parsing:</b> Efficiently extracts metadata from {@code .safetensors} file headers using
- *   memory-mapped I/O.</li>
- *   <li><b>Filename Heuristics:</b> Matches filenames against known architectural patterns and keywords.</li>
- *   <li><b>External API Lookup:</b> Computes file hashes and queries the Civitai API as a final fallback,
- *   caching results locally for future sessions.</li>
+ *   <li><b>Sidecar Inspection:</b> Directly reads {@code .civitai.info} sidecar files for authoritative
+ *   metadata provided by the user or previous organization runs.</li>
+ *   <li><b>Header Parsing:</b> Extracts metadata directly from {@code .safetensors} file headers.
+ *   Uses efficient memory-mapped I/O and LITTLE_ENDIAN byte parsing to minimize memory footprint
+ *   during scans of massive model files.</li>
+ *   <li><b>Filename Heuristics:</b> Applies pattern matching and tokenization to filenames to infer
+ *   architecture (e.g., "Flux", "SDXL", "Wan") when internal metadata is missing or ambiguous.</li>
+ *   <li><b>External API Lookup:</b> Computes SHA-256 file hashes and queries the Civitai API. Results
+ *   are cached locally as sidecar files to optimize subsequent analysis sessions.</li>
  * </ol>
  * </p>
  *
- * <p>This class handles the complexity of mapping various metadata formats into a unified
- * set of architectural categories (e.g., SDXL, Flux, Pony), facilitating consistent organization
- * across large model libraries.</p>
+ * <p>This engine is crucial for classifying models into a unified set of architectural categories,
+ * enabling the {@link OrganizationService} to perform structured library relocations.</p>
+ *
+ * @see OrganizationService
+ * @see CivitaiApiClient
  */
 public class ModelAnalyzer {
 
