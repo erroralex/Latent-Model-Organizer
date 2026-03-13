@@ -18,7 +18,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 export default defineConfig({
   plugins: [
     vue(),
-    vueDevTools(),
+    // vueDevTools(), // Disabled to remove "Toggle Vue Dev tools" overlay
   ],
   server: {
     strictPort: true,

@@ -1,16 +1,18 @@
 /**
- * A Vue composable for dynamic runtime theme management.
+ * <h1>useTheme</h1>
+ * <p>
+ * A Vue composable for high-performance, dynamic runtime theme management.
+ * This service leverages Vite's static asset discovery to load and inject
+ * CSS variables based on user selection.
+ * </p>
  *
- * This service leverages Vite's glob import feature to discover and load CSS
- * theme files from the filesystem at runtime. It provides a mechanism to
- * inject raw CSS strings directly into the document head and synchronize
- * the application's visual state with the user's preferences.
- *
- * Core features:
- * - Dynamic Injection: Updates a dedicated <style> element with the selected theme's CSS variables.
- * - Persistence: Synchronizes the selected theme with localStorage for session-to-session consistency.
- * - Class Management: Toggles theme-specific classes (e.g., .theme-neon) on the body element to support scope-based CSS overrides.
- * - Auto-Discovery: Automatically populates the list of available themes based on the contents of the assets/css/themes directory.
+ * <h2>Theme Injection Pipeline</h2>
+ * <ul>
+ *   <li><b>Discovery:</b> Automatically scans the {@code assets/css/themes} directory to build the available theme registry.</li>
+ *   <li><b>Dynamic Injection:</b> Asynchronously fetches and injects the selected theme's raw CSS into a dedicated {@code <style>} element in the document head.</li>
+ *   <li><b>Class Synchronization:</b> Manages the {@code .theme-*} class on the body element to allow for scoped component overrides.</li>
+ *   <li><b>Persistence:</b> Synchronizes the selected theme with {@code localStorage} for session consistency.</li>
+ * </ul>
  */
 
 import { ref } from 'vue';

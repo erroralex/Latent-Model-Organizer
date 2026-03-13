@@ -7,7 +7,7 @@
     </appender>
 
     <!-- Custom SSE Appender (for Frontend console) -->
-    <appender name="SSE" class="com.latent.organizer.api.SseLogAppender" />
+    <appender name="SSE" class="com.nilsson.lmo.api.SseLogAppender" />
 
     <!-- Root Logger Configuration -->
     <root level="INFO">

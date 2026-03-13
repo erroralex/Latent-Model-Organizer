@@ -18,10 +18,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
     selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
     openExternal: (url) => ipcRenderer.send('shell:openExternal', url),
+    closeApp: () => ipcRenderer.send('app:quit'),
 });
 
 contextBridge.exposeInMainWorld('windowAPI', {
     minimize: () => ipcRenderer.send('window:minimize'),
     maximize: () => ipcRenderer.send('window:maximize'),
-    close: () => ipcRenderer.send('window:close')
+    close: () => ipcRenderer.send('app:quit') // Mapped to app:quit for consistent shutdown
 });

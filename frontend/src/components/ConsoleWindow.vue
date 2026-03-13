@@ -1,20 +1,20 @@
-/**
-* A real-time log propagation console for backend monitoring.
-*
-* This component establishes a persistent Server-Sent Events (SSE) bridge to the
-* Java backend, streaming internal SLF4J logs directly into a dark-themed terminal
-* interface. It implements semantic color coding based on log levels and features
-* a reactive auto-scrolling engine.
-*
-* Capabilities:
-* - Semantic Highlighting: Dynamically maps log levels (INFO, WARN, ERROR, DEBUG)
-*   to a specific color palette for quick visual diagnostics.
-* - Rolling Buffer: Automatically prunes history beyond 1000 entries to maintain
-*   optimal memory performance in long-running sessions.
-* - Interaction Controls: Provides clear-all functionality and toggleable auto-scroll
-*   behavior for inspecting specific historical log segments.
-*/
 <script setup>
+/**
+ * CONSOLEWINDOW.VUE
+ *
+ * A real-time log propagation console for backend monitoring.
+ * This component establishes a persistent Server-Sent Events (SSE) bridge to the
+ * Java backend, streaming internal SLF4J logs directly into a terminal interface.
+ *
+ * DIAGNOSTIC CAPABILITIES:
+ * - Semantic Highlighting: Dynamically maps log levels (INFO, WARN, ERROR, DEBUG) to specific colors for rapid troubleshooting.
+ * - Rolling Buffer: Maintains a maximum history of 1000 entries to optimize memory performance during long sessions.
+ * - Interactive Controls: Includes auto-scroll toggling and log clearing functionality for focused inspection.
+ * - Resilient Connection: Implements automatic reconnection logic with exponential backoff for the SSE stream.
+ *
+ * @see SseLogAppender.java
+ * @see LogStreamHandler.java
+ */
 import {ref, onMounted, onUnmounted, nextTick, watch} from 'vue';
 
 const logs = ref([]);
@@ -111,7 +111,6 @@ onUnmounted(() => eventSource?.close());
 .console-root {
   display: flex;
   flex-direction: column;
-  height: 100%;
   background: #0d1117;
   overflow: hidden;
 }

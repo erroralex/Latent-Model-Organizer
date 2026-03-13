@@ -1,4 +1,4 @@
-package com.latent.organizer.api;
+package com.nilsson.lmo.api;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
@@ -11,23 +11,29 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * <p>The {@code SseLogAppender} is a high-concurrency Logback appender designed for Server-Sent Events (SSE)
- * broadcasting. It captures system logging events and propagates them to connected clients in real-time.</p>
- *
- * <p>This component acts as a bridge between the application's logging infrastructure and the web interface,
- * allowing developers to monitor backend activity directly from the frontend. It maintains a
- * thread-safe registry of active client writers and handles broadcasting with defensive error
- * management to prune stale connections.</p>
- *
- * <p>Architectural Features:
- * <ul>
- *   <li><b>Concurrent Registry:</b> Uses {@link CopyOnWriteArrayList} for thread-safe management
- *   of client {@link PrintWriter} instances.</li>
- *   <li><b>Log Formatting:</b> Applies custom formatting to logging events for optimized readability
- *   within a browser-based console.</li>
- *   <li><b>Automatic Cleanup:</b> Detects and removes disconnected clients during the broadcast cycle.</li>
- * </ul>
+ * <h1>SseLogAppender</h1>
+ * <p>
+ * A custom Logback appender engineered for broadcasting system logs via Server-Sent Events (SSE).
+ * This class captures logging events from across the application and propagates them to
+ * all active web clients in real-time.
  * </p>
+ *
+ * <h2>Technical Design</h2>
+ * <p>
+ * This appender maintains a thread-safe registry of connected client {@link PrintWriter}s
+ * using a {@link CopyOnWriteArrayList}, facilitating high-concurrency event broadcasting.
+ * It formats log entries into a standardized console-ready string before dispatch.
+ * </p>
+ *
+ * <h2>Broadcast Lifecycle</h2>
+ * <ul>
+ *   <li><b>Interception:</b> Captures {@link ILoggingEvent} objects from the Logback context.</li>
+ *   <li><b>Formatting:</b> Converts logs into the {@code data: [log content]\n\n} SSE format.</li>
+ *   <li><b>Distribution:</b> Asynchronously pushes formatted messages to all registered clients.</li>
+ *   <li><b>Resilience:</b> Automatically detects and prunes stale connections if writing fails.</li>
+ * </ul>
+ *
+ * @see LogStreamHandler
  */
 public class SseLogAppender extends AppenderBase<ILoggingEvent> {
 

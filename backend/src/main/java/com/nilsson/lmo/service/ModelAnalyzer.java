@@ -1,10 +1,10 @@
-package com.latent.organizer.service;
+package com.nilsson.lmo.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.latent.organizer.domain.ModelMetadata;
-import com.latent.organizer.exception.OrganizerException;
-import com.latent.organizer.util.HashUtil;
+import com.nilsson.lmo.domain.ModelMetadata;
+import com.nilsson.lmo.exception.OrganizerException;
+import com.nilsson.lmo.util.HashUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

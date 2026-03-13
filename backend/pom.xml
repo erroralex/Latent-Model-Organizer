@@ -39,7 +39,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.latent.organizer.OrganizerApplication</mainClass>
+                            <mainClass>com.nilsson.lmo.LmoApplication</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -58,7 +58,7 @@
                             <finalName>backend</finalName>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>com.latent.organizer.OrganizerApplication</mainClass>
+                                    <mainClass>com.nilsson.lmo.LmoApplication</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>

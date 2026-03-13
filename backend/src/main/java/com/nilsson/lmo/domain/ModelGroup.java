@@ -1,4 +1,4 @@
-package com.latent.organizer.domain;
+package com.nilsson.lmo.domain;
 
 import java.nio.file.Path;
 import java.util.List;
