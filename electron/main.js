@@ -20,7 +20,7 @@
 
 const {app, BrowserWindow, ipcMain, dialog, shell} = require('electron');
 const path = require('node:path');
-const {exec, spawn} = require('child_process');
+const {exec, spawn, execSync} = require('child_process');
 const fs = require('fs');
 
 // Reliable check for development mode
@@ -129,8 +129,13 @@ app.whenReady().then(() => {
         else win?.maximize();
     });
 
+    // Modified Handler: Force app quit instead of just closing window
     ipcMain.on('window:close', (event) => {
-        BrowserWindow.fromWebContents(event.sender)?.close();
+         app.quit();
+    });
+
+    ipcMain.on('app:quit', (event) => {
+        app.quit();
     });
 
     createWindow();
@@ -140,22 +145,25 @@ app.whenReady().then(() => {
     });
 });
 
-app.on('window-all-closed', async () => {
-    console.log('Window closed. Initiating shutdown…');
-
+// Robust Shutdown Logic
+app.on('before-quit', async (event) => {
+    console.log('App quitting. Initiating cleanup...');
+    
     // 1. Kill backend gracefully if running (Production only)
     if (backendProcess) {
         try {
+            // Attempt graceful shutdown via API
             await fetch('http://localhost:8080/api/shutdown', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
             });
         } catch (e) {
+            // Fallback to force kill
             backendProcess.kill(); 
         }
-    } else if (isDev) {
-        // In dev, strictly optional to try killing the external backend
-        // We usually leave it running for faster dev cycles, but here we try to be clean.
+    } 
+    // In dev, try to signal the backend too if it's listening
+    else if (isDev) {
         try {
             await fetch('http://localhost:8080/api/shutdown', {
                 method: 'POST',
@@ -163,12 +171,46 @@ app.on('window-all-closed', async () => {
             });
         } catch (ignored) {}
     }
+});
 
-    // 2. Kill Vite (Dev only)
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
+});
+
+app.on('will-quit', () => {
+    // 1. Force kill Vite gracefully before we exit
+    if (isDev && process.platform === 'win32') {
+        try {
+            console.log('Attempting to force kill Vite server on port 5173...');
+            const stdout = execSync('netstat -ano | findstr :5173', { encoding: 'utf-8' });
+            
+            if (stdout) {
+                const lines = stdout.trim().split('\n');
+                lines.forEach(line => {
+                    if (line.includes('LISTENING')) {
+                        const parts = line.trim().split(/\s+/);
+                        const pid = parts[parts.length - 1]; 
+                        if (pid && !isNaN(pid)) {
+                            console.log(`Killing Vite process with PID: ${pid}`);
+                            try {
+                                execSync(`taskkill /PID ${pid} /F /T`, { stdio: 'ignore' });
+                            } catch (killErr) {
+                                // Ignore if already dead
+                            }
+                        }
+                    }
+                });
+            }
+        } catch (e) {
+            // Ignore netstat errors if nothing is found
+        }
+    }
+
+    // 2. Final safety net: Force kill Electron process tree
     if (isDev) {
-        // Just quit the app, Vite is usually managed by the terminal that ran `npm run dev`
-        app.quit();
-    } else {
-        app.quit();
+        console.log('Force killing dev process tree...');
+        process.exit(0);
     }
 });

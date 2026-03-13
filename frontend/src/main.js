@@ -1,19 +1,20 @@
 /**
- * The main entry point for the Vue 3 application.
+ * <h1>Main Entry Point</h1>
+ * <p>
+ * This script orchestrates the bootstrap process for the Vue 3 application.
+ * It ensures the consistent application of user preferences, initializes UI frameworks,
+ * and manages the global stylesheet cascade.
+ * </p>
  *
- * This bootstrap script orchestrates the initial application lifecycle, ensuring a
- * flicker-free startup experience by applying user theme preferences synchronously
- * before the first paint. It handles the critical registration of the PrimeVue
- * component framework and manages the complex cascade of theme and component
- * stylesheets.
+ * <h2>Bootstrap Sequence</h2>
+ * <ol>
+ *   <li><b>Theme Pre-loading:</b> Synchronously applies the user's saved theme from {@code localStorage} to the body class to prevent flash-of-unstyled-content (FOUC).</li>
+ *   <li><b>Asset Import:</b> Imports critical theme variables and component-level CSS modules.</li>
+ *   <li><b>Framework Setup:</b> Initializes the Vue application instance and configures PrimeVue for high-performance UI components.</li>
+ *   <li><b>DOM Mounting:</b> Attaches the root application component to the {@code #app} container.</li>
+ * </ol>
  *
- * Key Bootstrap Phases:
- * - Theme Propagation: Injects global CSS variables from theme-specific files.
- * - Framework Initialization: Configures the Vue application instance with PrimeVue.
- * - CSS Cascade Management: Enforces a strict import order to ensure component
- *   styles correctly override base resets and theme defaults.
- * - State Restoration: Synchronizes the initial DOM state with persistent
- *   localStorage settings.
+ * @see App.vue
  */
 
 import './assets/css/themes/neon.css'

@@ -1,6 +1,7 @@
-package com.latent.organizer.service;
+package com.nilsson.lmo.service;
 
-import com.latent.organizer.exception.OrganizerException;
+import com.nilsson.lmo.exception.OrganizerException;
+import com.nilsson.lmo.util.HashUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -164,7 +165,7 @@ public class CivitaiApiClient implements AutoCloseable {
         logger.debug("Computing SHA-256 for '{}' ({}MB)...", fileName, sizeMb >= 0 ? sizeMb : "?");
         long start = System.currentTimeMillis();
 
-        String hash = com.latent.organizer.util.HashUtil.calculateSHA256(modelPath);
+        String hash = HashUtil.calculateSHA256(modelPath);
 
         long elapsed = System.currentTimeMillis() - start;
         if (elapsed >= HASH_WARN_THRESHOLD_MS) {

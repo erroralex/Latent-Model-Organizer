@@ -1,13 +1,13 @@
-package com.latent.organizer;
+package com.nilsson.lmo;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.latent.organizer.api.LogStreamHandler;
-import com.latent.organizer.domain.FetchRequest;
-import com.latent.organizer.domain.OperationReport;
-import com.latent.organizer.domain.OrganizationRequest;
-import com.latent.organizer.exception.OrganizerException;
-import com.latent.organizer.service.ModelAnalyzer;
-import com.latent.organizer.service.OrganizationService;
+import com.nilsson.lmo.api.LogStreamHandler;
+import com.nilsson.lmo.domain.FetchRequest;
+import com.nilsson.lmo.domain.OperationReport;
+import com.nilsson.lmo.domain.OrganizationRequest;
+import com.nilsson.lmo.exception.OrganizerException;
+import com.nilsson.lmo.service.ModelAnalyzer;
+import com.nilsson.lmo.service.OrganizationService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -20,30 +20,48 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.Executors;
 
 /**
- * <p>The {@code OrganizerApplication} serves as the primary entry point and orchestration layer for the
- * Latent Model Organizer Backend. It initializes the core services and manages a lightweight
- * {@link HttpServer} to handle RESTful interactions.</p>
- *
- * <p>The system is designed for high-performance machine learning model management, providing endpoints
- * for model organization, metadata retrieval, and real-time log streaming via SSE. It leverages
- * Java 21 Virtual Threads to handle concurrent API requests efficiently without taxing system resources.</p>
- *
- * <p>Key Endpoints:
- * <ul>
- *   <li>{@code /api/organize}: Triggers the model classification and movement logic.</li>
- *   <li>{@code /api/fetch}: Initiates metadata discovery from external sources like Civitai.</li>
- *   <li>{@code /api/logs}: Provides a Server-Sent Events stream of system logs.</li>
- *   <li>{@code /api/shutdown}: Gracefully terminates the application service.</li>
- * </ul>
+ * <h1>LmoApplication</h1>
+ * <p>
+ * The central entry point for the Latent Model Organizer Backend application.
+ * This class orchestrates the initialization of core services and provides a high-performance
+ * HTTP server implementation for managing machine learning model file systems.
  * </p>
+ *
+ * <h2>Architecture Overview</h2>
+ * <p>
+ * The application leverages a lightweight {@link HttpServer} configured with a
+ * <b>Virtual Thread Per Task Executor</b> (Project Loom), ensuring that each incoming request
+ * is handled by a lightweight thread. This architecture allows the system to remain highly
+ * responsive during I/O-bound operations like directory scanning, file hashing, and
+ * external API communication with Civitai.
+ * </p>
+ *
+ * <h2>Core Functionalities</h2>
+ * <ul>
+ *   <li><b>Model Organization:</b> Categorizes and moves model files based on identified architectures via {@code /api/organize}.</li>
+ *   <li><b>Metadata Retrieval:</b> Scans for missing sidecar files and fetches data from external providers via {@code /api/fetch}.</li>
+ *   <li><b>Real-time Monitoring:</b> Streams system logs to clients using Server-Sent Events (SSE) via {@code /api/logs}.</li>
+ *   <li><b>Process Management:</b> Handles graceful termination of the JVM via {@code /api/shutdown}.</li>
+ * </ul>
+ *
+ * <h2>Implementation Details</h2>
+ * <p>
+ * The application uses Jackson for JSON serialization/deserialization and SLF4J/Logback for
+ * logging. CORS headers are automatically applied to all responses to support browser-based
+ * frontend clients.
+ * </p>
+ *
+ * @see OrganizationService
+ * @see LogStreamHandler
  */
-public class OrganizerApplication {
+public class LmoApplication {
 
-    private static final Logger logger = LoggerFactory.getLogger(OrganizerApplication.class);
+    private static final Logger logger = LoggerFactory.getLogger(LmoApplication.class);
     private static final int PORT = 8080;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -53,7 +71,6 @@ public class OrganizerApplication {
             OrganizationService organizationService = new OrganizationService(modelAnalyzer);
 
             HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
-
             server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
             server.createContext("/api/organize", new OrganizeHandler(organizationService));
@@ -90,8 +107,7 @@ public class OrganizerApplication {
                 return;
             }
 
-            try {
-                InputStream requestBody = exchange.getRequestBody();
+            try (InputStream requestBody = exchange.getRequestBody()) {
                 OrganizationRequest request = objectMapper.readValue(requestBody, OrganizationRequest.class);
                 logger.info("Received organization request: {}", request);
 
@@ -103,7 +119,7 @@ public class OrganizerApplication {
                 OperationReport report = organizationService.organizeModels(
                         Paths.get(request.sourceDirectory()),
                         Paths.get(request.targetDirectory()),
-                        request.allowedArchitectures(),
+                        request.allowedArchitectures() != null ? request.allowedArchitectures() : Collections.emptyList(),
                         request.isRecursive(),
                         request.isDryRun()
                 );
@@ -137,8 +153,7 @@ public class OrganizerApplication {
                 return;
             }
 
-            try {
-                InputStream requestBody = exchange.getRequestBody();
+            try (InputStream requestBody = exchange.getRequestBody()) {
                 FetchRequest request = objectMapper.readValue(requestBody, FetchRequest.class);
                 logger.info("Received fetch request: {}", request);
 
@@ -182,18 +197,25 @@ public class OrganizerApplication {
                 return;
             }
 
-            logger.info("Received shutdown signal.");
-            sendJson(exchange, 200, Map.of("status", "shutting down"));
+            logger.info("Received shutdown signal. Initiating graceful termination sequence.");
 
+            // Spawn a virtual thread to halt the JVM to bypass deadlocks with active SSE streams
             Thread.ofVirtual().start(() -> {
                 try {
-                    Thread.sleep(100);
+                    Thread.sleep(500);
                 } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
                 }
-                logger.info("Stopping HTTP Server...");
-                server.stop(0);
-                System.exit(0);
+
+                logger.info("JVM exiting immediately via Runtime.halt(0).");
+                Runtime.getRuntime().halt(0);
             });
+
+            try {
+                sendJson(exchange, 200, Map.of("status", "shutting down"));
+            } catch (IOException e) {
+                logger.warn("Client disconnected before shutdown response could be sent. Proceeding with shutdown.");
+            }
         }
     }
 

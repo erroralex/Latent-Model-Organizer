@@ -1,4 +1,4 @@
-package com.latent.organizer.api;
+package com.nilsson.lmo.api;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -11,25 +11,29 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 
 /**
- * <p>The {@code LogStreamHandler} implements a Server-Sent Events (SSE) gateway for real-time log propagation
- * from the backend to connected clients. It manages persistent HTTP connections and facilitates
- * asynchronous event streaming.</p>
- *
- * <p>This handler transforms standard HTTP requests into long-lived event streams by setting appropriate
- * headers and leveraging {@link SseLogAppender} for message broadcasting. It is designed to run
- * within a Virtual Thread environment to support a high number of concurrent monitoring sessions
- * with minimal overhead.</p>
- *
- * <p>Implementation Details:
- * <ul>
- *   <li><b>Connection Persistence:</b> Uses {@link CountDownLatch} to maintain the connection lifecycle
- *   until client disconnection.</li>
- *   <li><b>Resource Management:</b> Automatically registers and unregisters clients in the
- *   {@link SseLogAppender} registry to ensure memory safety.</li>
- *   <li><b>Protocol Compliance:</b> Adheres to the {@code text/event-stream} specification, including
- *   CORS and cache-control configurations.</li>
- * </ul>
+ * <h1>LogStreamHandler</h1>
+ * <p>
+ * Implements a Server-Sent Events (SSE) gateway for real-time log propagation.
+ * This handler manages persistent HTTP connections, facilitating the asynchronous
+ * streaming of system events from the backend to connected clients.
  * </p>
+ *
+ * <h2>Streaming Mechanism</h2>
+ * <p>
+ * Upon receiving a GET request, the handler upgrades the connection to {@code text/event-stream}.
+ * It utilizes a {@link CountDownLatch} to maintain the connection lifecycle, effectively
+ * parking the handling thread (ideally a Virtual Thread) until the client disconnects or
+ * the server shuts down.
+ * </p>
+ *
+ * <h2>Resource Management</h2>
+ * <ul>
+ *   <li><b>Registration:</b> Registers the client's {@link PrintWriter} with the {@link SseLogAppender}.</li>
+ *   <li><b>Cleanup:</b> Ensures the writer is removed from the broadcast registry upon connection termination.</li>
+ *   <li><b>Efficiency:</b> Designed to run within a high-concurrency executor to support many simultaneous monitors.</li>
+ * </ul>
+ *
+ * @see SseLogAppender
  */
 public class LogStreamHandler implements HttpHandler {
 

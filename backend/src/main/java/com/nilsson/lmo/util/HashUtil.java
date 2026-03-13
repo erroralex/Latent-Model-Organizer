@@ -1,6 +1,6 @@
-package com.latent.organizer.util;
+package com.nilsson.lmo.util;
 
-import com.latent.organizer.exception.OrganizerException;
+import com.nilsson.lmo.exception.OrganizerException;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;

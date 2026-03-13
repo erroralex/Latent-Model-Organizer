@@ -1,4 +1,4 @@
-package com.latent.organizer.exception;
+package com.nilsson.lmo.exception;
 
 /**
  * <p>The {@code OrganizerException} class is the base domain exception for the Latent Model Organizer

@@ -1,18 +1,21 @@
-/**
-* A glassmorphic report modal for visualizing operation outcomes.
-*
-* This component provides a comprehensive post-operation summary, consuming the
-* {@code OperationReport} JSON payload from the Java backend. It utilizes a grid-based
-* statistics layout and dynamic progress bars to represent the distribution of processed
-* model groups across different architectural categories.
-*
-* Visual Features:
-* - High-level metrics: Total groups processed, uncategorized count, and error tallies.
-* - Categorical Breakdown: A list of architectures sorted by volume with relative percentage bars.
-* - Error Diagnostics: A specialized, scrollable section for reviewing specific process failures.
-* - Dry Run Indicators: Visual badges and title modifications when simulating operations.
-*/
 <script setup>
+/**
+ * SUMMARYMODAL.VUE
+ *
+ * A comprehensive reporting component that visualizes the results of a backend operation.
+ * It parses the OperationReport payload to provide high-level metrics,
+ * architectural breakdowns, and error diagnostics.
+ *
+ * REPORTING FEATURES:
+ * - Key Metrics: Displays total processed items, uncategorized counts, and error tallies in a responsive grid.
+ * - Architectural Breakdown: Sorts and visualizes processed models by architecture using relative percentage bars.
+ * - Error Diagnostics: Provides a dedicated, scrollable area for reviewing specific operational failures.
+ * - Process Context: Includes visual badges and title adjustments to distinguish between "Dry Run" simulations and actual filesystem changes.
+ *
+ * @see OperationReport.java
+ * @see SorterView.vue
+ * @see FetcherView.vue
+ */
 import {computed} from 'vue';
 
 const props = defineProps({

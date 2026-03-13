@@ -1,18 +1,19 @@
-/**
-* A centralized configuration modal for application preferences.
-*
-* This component manages global settings including visual themes, default operational
-* behaviors (Recursive Scanning, Dry Run), and external support links. It utilizes
-* a structured, sectioned layout to maintain clarity across multiple configuration
-* domains.
-*
-* Managed Domains:
-* - Appearance: Real-time theme switching with visual swatches.
-* - Operational Defaults: Configuration of persistent toggle states for scanning logic.
-* - External Integration: Bridges to external support platforms via Electron IPC.
-* - Versioning: Displays application metadata and technology stack information.
-*/
 <script setup>
+/**
+ * SETTINGSMODAL.VUE
+ *
+ * A centralized configuration interface for managing application-wide preferences.
+ * It provides controls for visual themes, operational defaults, and external support integrations.
+ *
+ * CONFIGURATION MODULES:
+ * - Appearance: Offers real-time theme switching with visual swatches and metadata-driven labeling.
+ * - Operational Defaults: Configures persistent states for core backend behaviors like deep scanning and dry-run mode.
+ * - External Integration: Provides links to external platforms (e.g., Ko-fi) via Electron's secure shell interface.
+ * - Application Info: Displays versioning and technology stack metadata for transparency.
+ *
+ * @see useTheme.js
+ * @see App.vue
+ */
 const props = defineProps({
   currentTheme: {type: String, required: true},
   availableThemes: {type: Array, required: true},

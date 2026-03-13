@@ -1,4 +1,4 @@
-package com.latent.organizer.domain;
+package com.nilsson.lmo.domain;
 
 /**
  * <p>The {@code ModelMetadata} record is an immutable representation of extracted or retrieved model metadata.
