@@ -64,6 +64,11 @@ public class CivitaiApiClient implements AutoCloseable {
                 .build();
     }
 
+    public CivitaiApiClient(HttpClient httpClient) {
+        this.executor = Executors.newVirtualThreadPerTaskExecutor();
+        this.httpClient = httpClient;
+    }
+
     public String fetchMetadataByHash(String sha256Hash) {
         if (sha256Hash == null || sha256Hash.isBlank()) {
             throw new IllegalArgumentException("Hash cannot be null or empty");
