@@ -13,7 +13,8 @@
   "type": "commonjs",
   "devDependencies": {
     "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "kill-port": "^2.0.1"
   },
   "build": {
     "appId": "com.latent.organizer",

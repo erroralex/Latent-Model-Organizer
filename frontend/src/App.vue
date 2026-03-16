@@ -9,12 +9,16 @@
  * KEY RESPONSIBILITIES:
  * - Navigation: Switches between Sorter and Fetcher views.
  * - API Orchestration: Centralizes HTTP communication with the backend.
+ *   The API base URL is constructed dynamically by querying the Electron main
+ *   process for the backend's ephemeral port on mount. In browser-only dev
+ *   mode (no Electron) it falls back to an empty base so Vite's dev proxy
+ *   handles the request.
  * - Persistence: Synchronizes user preferences (recursive, dry-run, directories) with LocalStorage.
  * - UI Shell: Controls the custom title bar, sidebar navigation, and integrated log console.
  * - State Management: Tracks processing status and operation reports for user feedback.
  */
-import {ref, computed, onMounted, watch} from 'vue';
-import {useTheme} from './composables/useTheme';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useTheme } from './composables/useTheme';
 import ConsoleWindow from './components/ConsoleWindow.vue';
 import SummaryModal from './components/Summarymodal.vue';
 import SettingsModal from './components/Settingsmodal.vue';
@@ -22,7 +26,7 @@ import Sidebar from './components/Sidebar.vue';
 import SorterView from './views/SorterView.vue';
 import FetcherView from './views/FetcherView.vue';
 
-const {currentTheme, availableThemes, applyTheme} = useTheme();
+const { currentTheme, availableThemes, applyTheme } = useTheme();
 
 const lsGet = (k, fb) => {
   try {
@@ -32,11 +36,11 @@ const lsGet = (k, fb) => {
     return fb;
   }
 };
+
 const lsSet = (k, v) => {
   try {
     localStorage.setItem(k, JSON.stringify(v));
-  } catch {
-  }
+  } catch { }
 };
 
 const activeTab = ref(lsGet('lmo:activeTab', 'sort'));
@@ -45,27 +49,27 @@ const isDryRun = ref(lsGet('lmo:isDryRun', false));
 const consoleOpen = ref(true);
 const showSettings = ref(false);
 
-watch(activeTab, v => lsSet('lmo:activeTab', v));
-watch(isRecursive, v => lsSet('lmo:isRecursive', v));
-watch(isDryRun, v => lsSet('lmo:isDryRun', v));
+watch(activeTab,   v => lsSet('lmo:activeTab',   v));
+watch(isRecursive, v => lsSet('lmo:isRecursive',  v));
+watch(isDryRun,    v => lsSet('lmo:isDryRun',     v));
 
-const statusMessage = ref('Ready.');
-const isProcessing = ref(false);
-const showReportModal = ref(false);
-const operationReport = ref(null);
-const canUndo = ref(false);
+const statusMessage     = ref('Ready.');
+const isProcessing      = ref(false);
+const showReportModal   = ref(false);
+const operationReport   = ref(null);
+const canUndo           = ref(false);
 const lastTargetDirectory = ref(lsGet('lmo:lastTargetDir', ''));
 
-const API_BASE = window.location?.hostname === 'localhost' ? '' : 'http://localhost:8080';
+const apiBase = ref('');
 
 const callApi = async (endpoint, body, msg) => {
   isProcessing.value = true;
   statusMessage.value = msg;
   try {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const res = await fetch(`${apiBase.value}${endpoint}`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || `Server error ${res.status}`);
@@ -80,7 +84,7 @@ const callApi = async (endpoint, body, msg) => {
   }
 };
 
-const handleStartOrganize = async ({sourceDirectory, targetDirectory, allowedArchitectures}) => {
+const handleStartOrganize = async ({ sourceDirectory, targetDirectory, allowedArchitectures }) => {
   if (!sourceDirectory || !targetDirectory) {
     statusMessage.value = '⚠️ Please select both source and target directories.';
     return;
@@ -90,13 +94,11 @@ const handleStartOrganize = async ({sourceDirectory, targetDirectory, allowedArc
     return;
   }
   canUndo.value = false;
-  const data = await callApi('/api/organize', {
-    sourceDirectory,
-    targetDirectory,
-    allowedArchitectures,
-    isRecursive: isRecursive.value,
-    isDryRun: isDryRun.value
-  }, '⏳ Scanning and organizing models…');
+  const data = await callApi(
+      '/api/organize',
+      { sourceDirectory, targetDirectory, allowedArchitectures, isRecursive: isRecursive.value, isDryRun: isDryRun.value },
+      '⏳ Scanning and organising models...'
+  );
   if (data && !isDryRun.value && data.totalProcessed > 0) {
     canUndo.value = true;
     lastTargetDirectory.value = targetDirectory;
@@ -105,45 +107,46 @@ const handleStartOrganize = async ({sourceDirectory, targetDirectory, allowedArc
 };
 
 const handleUndo = async () => {
-  isProcessing.value = true;
-  statusMessage.value = '⏳ Undoing last sort…';
-  try {
-    const res = await fetch(`${API_BASE}/api/undo`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({targetDirectory: lastTargetDirectory.value}),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || `Server error ${res.status}`);
-    statusMessage.value = '✅ ' + (data.message || 'Undo complete.');
-    operationReport.value = data;
-    showReportModal.value = true;
+  const data = await callApi(
+      '/api/undo',
+      { targetDirectory: lastTargetDirectory.value },
+      '⏳ Undoing last sort...'
+  );
+  if (data) {
     canUndo.value = false;
-  } catch (err) {
-    statusMessage.value = '❌ ' + err.message;
-  } finally {
-    isProcessing.value = false;
   }
 };
 
-const handleStartFetch = ({targetDirectory}) => {
+const handleStartFetch = ({ targetDirectory }) => {
   if (!targetDirectory) {
     statusMessage.value = '⚠️ Please select a folder to scan.';
     return;
   }
-  callApi('/api/fetch', {
-    targetDirectory,
-    isRecursive: isRecursive.value,
-    isDryRun: isDryRun.value
-  }, '⏳ Scanning for missing metadata…');
+  callApi(
+      '/api/fetch',
+      { targetDirectory, isRecursive: isRecursive.value, isDryRun: isDryRun.value },
+      '⏳ Scanning for missing metadata...'
+  );
 };
 
 const minimizeWindow = () => window.windowAPI?.minimize();
 const maximizeWindow = () => window.windowAPI?.maximize();
-const closeWindow = () => window.windowAPI?.close();
+const closeWindow    = () => window.windowAPI?.close();
 
-onMounted(() => {
+onMounted(async () => {
   applyTheme(currentTheme.value);
+
+  if (window.electronAPI?.getBackendPort) {
+    try {
+      const port = await window.electronAPI.getBackendPort();
+      if (port) {
+        apiBase.value = `http://localhost:${port}`;
+        console.log(`[App] Backend API base resolved to: ${apiBase.value}`);
+      }
+    } catch (err) {
+      console.warn('[App] Could not retrieve backend port from main process:', err);
+    }
+  }
 });
 
 const statusClass = computed(() => {
@@ -177,12 +180,15 @@ const closeReport = () => {
       <div class="hdr-drag-region"></div>
 
       <div class="hdr-controls">
-        <button class="nav-btn icon-only no-drag" @click="minimizeWindow" title="Minimize"><i class="pi pi-minus"></i>
+        <button class="nav-btn icon-only no-drag" @click="minimizeWindow" title="Minimize">
+          <i class="pi pi-minus"></i>
         </button>
-        <button class="nav-btn icon-only no-drag" @click="maximizeWindow" title="Maximize"><i
-            class="pi pi-window-maximize"></i></button>
-        <button class="nav-btn icon-only window-close-btn no-drag" @click="closeWindow" title="Close"><i
-            class="pi pi-times"></i></button>
+        <button class="nav-btn icon-only no-drag" @click="maximizeWindow" title="Maximize">
+          <i class="pi pi-window-maximize"></i>
+        </button>
+        <button class="nav-btn icon-only window-close-btn no-drag" @click="closeWindow" title="Close">
+          <i class="pi pi-times"></i>
+        </button>
       </div>
     </header>
 
@@ -208,6 +214,7 @@ const closeReport = () => {
                   :isRecursive="isRecursive"
                   :isDryRun="isDryRun"
                   :canUndo="canUndo"
+                  :apiBase="apiBase"
                   @update:isRecursive="v => isRecursive = v"
                   @update:isDryRun="v => isDryRun = v"
                   @start-organize="handleStartOrganize"
@@ -237,7 +244,6 @@ const closeReport = () => {
               ></i>
               {{ statusMessage }}
             </div>
-
           </div>
         </div>
 
