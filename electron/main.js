@@ -9,71 +9,131 @@
  * Core Responsibilities:
  * - Native Orchestration: Configures and manages the frameless BrowserWindow,
  *   injecting the secure preload bridge for frontend communication.
- * - IPC Gateway: Handles requests for native OS features including folder selection
- *   dialogs and opening external URLs in the default system browser.
+ * - Dynamic Port Handshake: Resolves the Java backend's ephemeral port by
+ *   parsing its stdout stream (primary) or polling a temp file (fallback),
+ *   then exposes the port to the renderer via IPC so the Vue frontend can
+ *   construct its API base URL without any hardcoded port numbers.
+ * - IPC Gateway: Handles requests for native OS features including folder
+ *   selection dialogs and opening external URLs in the default system browser.
  * - Window Management: Implements manual handlers for custom title bar controls
  *   (minimize, maximize, close) consistent with the glassmorphic UI design.
- * - Resource Sanitization: Executes a coordinated shutdown sequence that notifies
- *   the Java backend and forcefully terminates the Vite development server to
- *   ensure a clean system state upon exit.
+ * - Resource Sanitisation: Executes a coordinated shutdown sequence that
+ *   notifies the Java backend, force-kills the Vite dev server via the
+ *   cross-platform `kill-port` package, and forcefully terminates the process
+ *   tree to ensure a clean system state upon exit.
  */
 
-const {app, BrowserWindow, ipcMain, dialog, shell} = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('node:path');
-const {exec, spawn, execSync} = require('child_process');
+const os = require('node:os');
+const { spawn } = require('child_process');
 const fs = require('fs');
 
-// Reliable check for development mode
 const isDev = !app.isPackaged;
 let backendProcess = null;
+let backendPort = null;
+const PORT_FILE_PATH = path.join(os.tmpdir(), '.lmo-port');
 
-function getBackendPath() {
+function getBackendPaths() {
     if (isDev) {
-        // In dev, we assume the backend is either running separately OR
-        // we can try to run the jar if it was built.
-        // For simplicity in this project's context (per CONTRIBUTING.md),
-        // we expect the dev to run the backend in IntelliJ.
-        console.log('Development mode detected. Assuming backend is running externally or will be started manually.');
         return null;
     }
 
-    // In production, look for the bundled JRE and JAR
-    // structure: resources/app.asar/../../runtime/bin/java (or java.exe)
-    // jar: resources/app.asar/../../runtime/app/backend.jar
-
     const rootDir = path.join(process.resourcesPath, '..', 'runtime');
     const binName = process.platform === 'win32' ? 'java.exe' : 'java';
-    const javaPath = path.join(rootDir, 'bin', binName);
-    const jarPath = path.join(rootDir, 'app', 'backend.jar');
-
-    return { javaPath, jarPath };
+    return {
+        javaPath: path.join(rootDir, 'bin', binName),
+        jarPath: path.join(rootDir, 'app', 'backend.jar'),
+    };
 }
 
 function startBackend() {
-    const paths = getBackendPath();
-    if (!paths) return;
+    const PORT_RESOLUTION_TIMEOUT_MS = 15_000;
+    const PORT_POLL_INTERVAL_MS = 200;
 
-    if (!fs.existsSync(paths.javaPath)) {
-        console.error(`JRE not found at: ${paths.javaPath}`);
-        return;
-    }
-    if (!fs.existsSync(paths.jarPath)) {
-        console.error(`Backend JAR not found at: ${paths.jarPath}`);
-        return;
-    }
+    return new Promise((resolve, reject) => {
+        let resolved = false;
 
-    console.log('Starting Java backend...');
-    backendProcess = spawn(paths.javaPath, ['-jar', paths.jarPath], {
-        stdio: 'ignore', // Detach stdio or redirect to log file if needed
-        windowsHide: true // Hide console window on Windows
-    });
+        const finish = (port) => {
+            if (resolved) return;
+            resolved = true;
+            backendPort = port;
+            console.log(`[main] Backend port resolved: ${port}`);
+            resolve(port);
+        };
 
-    backendProcess.on('error', (err) => {
-        console.error('Failed to start backend:', err);
-    });
+        const fail = (reason) => {
+            if (resolved) return;
+            resolved = true;
+            console.error(`[main] Port resolution failed: ${reason}. Falling back to 8080.`);
+            backendPort = 8080;
+            resolve(8080);
+        };
 
-    backendProcess.on('exit', (code) => {
-        console.log(`Backend exited with code ${code}`);
+        const timeoutHandle = setTimeout(
+            () => fail(`timeout after ${PORT_RESOLUTION_TIMEOUT_MS}ms`),
+            PORT_RESOLUTION_TIMEOUT_MS
+        );
+
+        const startFilePoll = () => {
+            const pollHandle = setInterval(() => {
+                try {
+                    const raw = fs.readFileSync(PORT_FILE_PATH, 'utf8').trim();
+                    const port = parseInt(raw, 10);
+                    if (!isNaN(port) && port > 0) {
+                        clearInterval(pollHandle);
+                        clearTimeout(timeoutHandle);
+                        finish(port);
+                    }
+                } catch {
+                }
+            }, PORT_POLL_INTERVAL_MS);
+        };
+
+        if (isDev) {
+            console.log('[main] Dev mode - waiting for external backend port file...');
+            startFilePoll();
+            return;
+        }
+
+        const paths = getBackendPaths();
+
+        if (!fs.existsSync(paths.javaPath)) {
+            clearTimeout(timeoutHandle);
+            fail(`JRE not found at: ${paths.javaPath}`);
+            return;
+        }
+        if (!fs.existsSync(paths.jarPath)) {
+            clearTimeout(timeoutHandle);
+            fail(`Backend JAR not found at: ${paths.jarPath}`);
+            return;
+        }
+
+        console.log('[main] Spawning Java backend...');
+        backendProcess = spawn(paths.javaPath, ['-jar', paths.jarPath], {
+            stdio: ['ignore', 'pipe', 'ignore'],
+            windowsHide: true,
+        });
+
+        backendProcess.stdout.on('data', (data) => {
+            const text = data.toString();
+            const match = text.match(/LMO_PORT=(\d+)/);
+            if (match) {
+                const port = parseInt(match[1], 10);
+                clearTimeout(timeoutHandle);
+                finish(port);
+            }
+        });
+
+        backendProcess.on('error', (err) => {
+            console.error('[main] Failed to start backend:', err);
+        });
+
+        backendProcess.on('exit', (code) => {
+            console.log(`[main] Backend exited with code ${code}`);
+        });
+
+        startFilePoll();
     });
 }
 
@@ -91,30 +151,37 @@ function createWindow() {
     });
 
     if (isDev) {
-        // In dev, wait a sec for Vite to be ready if running concurrently,
-        // or just load localhost.
-        console.log('Loading development URL...');
+        console.log('[main] Loading development URL...');
         mainWindow.loadURL('http://localhost:5173');
-        // mainWindow.webContents.openDevTools(); // Optional: auto-open devtools
     } else {
-        // In production, load the built Vue app
         const indexPath = path.join(__dirname, '../frontend/dist/index.html');
-        mainWindow.loadFile(indexPath).catch(e => {
-            console.error('Failed to load index.html:', e);
+        mainWindow.loadFile(indexPath).catch((e) => {
+            console.error('[main] Failed to load index.html:', e);
         });
     }
 }
 
-app.whenReady().then(() => {
-    startBackend();
+app.whenReady().then(async () => {
+    await startBackend();
 
     ipcMain.handle('dialog:selectFolder', async () => {
-        const result = await dialog.showOpenDialog({properties: ['openDirectory']});
+        const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
         return result.canceled ? null : result.filePaths[0];
     });
 
+    ipcMain.handle('shell:openFolder', (_event, folderPath) => {
+        if (typeof folderPath === 'string' && folderPath.length > 0) {
+            return shell.openPath(folderPath);
+        }
+        return Promise.resolve('Invalid path');
+    });
+
+    ipcMain.handle('app:getBackendPort', () => backendPort);
+
     ipcMain.handle('api:undoLastOrganization', async () => {
-        const res = await fetch('http://localhost:8080/api/undo', { method: 'POST' });
+        const res = await fetch(`http://localhost:${backendPort}/api/undo`, {
+            method: 'POST',
+        });
         if (!res.ok) throw new Error(`Undo failed with status ${res.status}`);
         return res.json();
     });
@@ -135,14 +202,8 @@ app.whenReady().then(() => {
         else win?.maximize();
     });
 
-    // Modified Handler: Force app quit instead of just closing window
-    ipcMain.on('window:close', (event) => {
-        app.quit();
-    });
-
-    ipcMain.on('app:quit', (event) => {
-        app.quit();
-    });
+    ipcMain.on('window:close', () => app.quit());
+    ipcMain.on('app:quit', () => app.quit());
 
     createWindow();
 
@@ -151,31 +212,35 @@ app.whenReady().then(() => {
     });
 });
 
-// Robust Shutdown Logic
-app.on('before-quit', async (event) => {
-    console.log('App quitting. Initiating cleanup...');
+app.on('before-quit', async () => {
+    console.log('[main] App quitting - initiating cleanup...');
 
-    // 1. Kill backend gracefully if running (Production only)
+    const shutdownUrl = `http://localhost:${backendPort}/api/shutdown`;
+
     if (backendProcess) {
         try {
-            // Attempt graceful shutdown via API
-            await fetch('http://localhost:8080/api/shutdown', {
+            await fetch(shutdownUrl, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
             });
-        } catch (e) {
-            // Fallback to force kill
+        } catch {
             backendProcess.kill();
         }
-    }
-    // In dev, try to signal the backend too if it's listening
-    else if (isDev) {
+    } else if (isDev) {
         try {
-            await fetch('http://localhost:8080/api/shutdown', {
+            await fetch(shutdownUrl, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
             });
-        } catch (ignored) {}
+        } catch {
+        }
+    }
+
+    try {
+        if (fs.existsSync(PORT_FILE_PATH)) {
+            fs.unlinkSync(PORT_FILE_PATH);
+        }
+    } catch {
     }
 });
 
@@ -185,38 +250,18 @@ app.on('window-all-closed', () => {
     }
 });
 
-app.on('will-quit', () => {
-    // 1. Force kill Vite gracefully before we exit
-    if (isDev && process.platform === 'win32') {
-        try {
-            console.log('Attempting to force kill Vite server on port 5173...');
-            const stdout = execSync('netstat -ano | findstr :5173', { encoding: 'utf-8' });
+app.on('will-quit', async () => {
+    if (!isDev) return;
 
-            if (stdout) {
-                const lines = stdout.trim().split('\n');
-                lines.forEach(line => {
-                    if (line.includes('LISTENING')) {
-                        const parts = line.trim().split(/\s+/);
-                        const pid = parts[parts.length - 1];
-                        if (pid && !isNaN(pid)) {
-                            console.log(`Killing Vite process with PID: ${pid}`);
-                            try {
-                                execSync(`taskkill /PID ${pid} /F /T`, { stdio: 'ignore' });
-                            } catch (killErr) {
-                                // Ignore if already dead
-                            }
-                        }
-                    }
-                });
-            }
-        } catch (e) {
-            // Ignore netstat errors if nothing is found
+    try {
+        const killPort = require('kill-port');
+        await killPort(5173);
+        console.log('[main] Vite dev server on port 5173 terminated.');
+    } catch (err) {
+        if (err.code !== 'MODULE_NOT_FOUND') {
+            console.warn('[main] Could not kill Vite process (may already be stopped):', err.message);
         }
     }
 
-    // 2. Final safety net: Force kill Electron process tree
-    if (isDev) {
-        console.log('Force killing dev process tree...');
-        process.exit(0);
-    }
+    process.exit(0);
 });

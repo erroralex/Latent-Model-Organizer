@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -68,6 +69,14 @@ public class OrganizationService {
     }
 
     public OperationReport organizeModels(Path sourceDir, Path targetDir, List<String> allowedArchitectures, boolean isRecursive, boolean isDryRun) {
+        return organizeModels(sourceDir, targetDir, allowedArchitectures, isRecursive, isDryRun, total -> {
+        }, () -> {
+        });
+    }
+
+    public OperationReport organizeModels(Path sourceDir, Path targetDir, List<String> allowedArchitectures,
+                                          boolean isRecursive, boolean isDryRun,
+                                          IntConsumer onTotalKnown, Runnable onGroupComplete) {
         logger.info("Starting organization task. Recursive: {}, Dry Run: {}", isRecursive, isDryRun);
         Set<String> allowedSet = buildAllowedSet(allowedArchitectures);
 
@@ -88,11 +97,15 @@ public class OrganizationService {
             Map<String, List<Path>> groupedFiles = groupByPrefix(allFiles);
             logger.info("Identified {} model groups via prefix matching.", groupedFiles.size());
 
+            onTotalKnown.accept(groupedFiles.size());
+
             List<Future<?>> futures = new ArrayList<>();
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 for (Map.Entry<String, List<Path>> entry : groupedFiles.entrySet()) {
-                    futures.add(executor.submit(() ->
-                            processGroup(entry.getKey(), entry.getValue(), targetDir, allowedSet, isDryRun, stats, errors, moveLog, createdDirs)));
+                    futures.add(executor.submit(() -> {
+                        processGroup(entry.getKey(), entry.getValue(), targetDir, allowedSet, isDryRun, stats, errors, moveLog, createdDirs);
+                        onGroupComplete.run();
+                    }));
                 }
             }
 
@@ -186,6 +199,13 @@ public class OrganizationService {
     }
 
     public OperationReport fetchMissingMetadata(Path targetDir, boolean isRecursive, boolean isDryRun) {
+        return fetchMissingMetadata(targetDir, isRecursive, isDryRun, total -> {
+        }, () -> {
+        });
+    }
+
+    public OperationReport fetchMissingMetadata(Path targetDir, boolean isRecursive, boolean isDryRun,
+                                                IntConsumer onTotalKnown, Runnable onItemComplete) {
         logger.info("Starting metadata fetch scan. Recursive: {}, Dry Run: {}", isRecursive, isDryRun);
 
         ConcurrentHashMap<String, AtomicInteger> stats = new ConcurrentHashMap<>();
@@ -201,10 +221,15 @@ public class OrganizationService {
             int totalProcessed = modelsToProcess.size();
             logger.info("Found {} models missing metadata sidecars.", totalProcessed);
 
+            onTotalKnown.accept(totalProcessed);
+
             List<Future<?>> fetchFutures = new ArrayList<>();
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 for (Path modelPath : modelsToProcess) {
-                    fetchFutures.add(executor.submit(() -> processMissingMetadata(modelPath, isDryRun, stats, errors)));
+                    fetchFutures.add(executor.submit(() -> {
+                        processMissingMetadata(modelPath, isDryRun, stats, errors);
+                        onItemComplete.run();
+                    }));
                 }
             }
             for (Future<?> f : fetchFutures) {

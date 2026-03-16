@@ -3,40 +3,43 @@
  * SORTERVIEW.VUE
  *
  * The primary interface for orchestrating the model organization workflow.
- * It manages the selection of source and target directories, architectural filtering,
- * and the execution of the sorting logic.
+ * It manages the selection of source and target directories, architectural
+ * filtering, and the execution of the sorting logic.
  *
  * KEY FEATURES:
- * - Directory Management: Uses Electron-native dialogs for reliable folder selection.
- * - Architecture Filtering: Features a searchable, multi-select dropdown to target specific model types.
- * - Execution Modes: Toggles between standard organization, deep recursive scanning, and non-destructive dry runs.
- * - Undo Integration: Provides a direct interface to trigger the restoration of the previous filesystem state.
+ * - Directory Management: Uses Electron-native dialogs for reliable folder
+ *   selection. An "Open" button beside each path reveals the folder in the
+ *   native file explorer (cross-platform via shell.openPath).
+ * - Architecture Filtering: Features a searchable, multi-select dropdown to
+ *   target specific model types.
+ * - Execution Modes: Toggles between standard organization, deep recursive
+ *   scanning, and non-destructive dry runs.
+ * - Stopwatch: Measures wall-clock time from the moment the user fires the
+ *   operation until the backend responds, then holds the final time on screen.
+ * - Progress Bar: Fills asymptotically toward 85 % while the backend is busy
+ *   (honest about not knowing real progress), then snaps to 100 % on
+ *   completion and fades out after a short delay.
+ * - Undo Integration: Provides a direct interface to restore the previous
+ *   filesystem state.
  */
-import {ref, computed, watch, onMounted, onUnmounted} from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
 
 const props = defineProps({
-  isProcessing: {type: Boolean, default: false},
-  isRecursive: {type: Boolean, default: true},
-  isDryRun: {type: Boolean, default: false},
-  canUndo: {type: Boolean, default: false},
+  isProcessing: { type: Boolean, default: false },
+  isRecursive:  { type: Boolean, default: true  },
+  isDryRun:     { type: Boolean, default: false  },
+  canUndo:      { type: Boolean, default: false  },
+  apiBase:      { type: String,  default: ''     },
 });
 
-const emit = defineEmits(['start-organize', 'update:isRecursive', 'update:isDryRun', 'open-info', 'undo']);
+const emit = defineEmits(['start-organize', 'update:isRecursive', 'update:isDryRun', 'undo']);
 
 const lsGet = (k, fb) => {
-  try {
-    const v = localStorage.getItem(k);
-    return v !== null ? JSON.parse(v) : fb;
-  } catch {
-    return fb;
-  }
+  try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : fb; } catch { return fb; }
 };
 const lsSet = (k, v) => {
-  try {
-    localStorage.setItem(k, JSON.stringify(v));
-  } catch {
-  }
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch { }
 };
 
 const ALL_ARCHS = [
@@ -56,16 +59,32 @@ const ALL_ARCHS = [
 
 const sourceFolder = ref(lsGet('lmo:sourceFolder', ''));
 const targetFolder = ref(lsGet('lmo:targetFolder', ''));
-const selectedArchitectures = ref(lsGet('lmo:selectedArchs', [...ALL_ARCHS]));
 
 watch(sourceFolder, v => lsSet('lmo:sourceFolder', v));
 watch(targetFolder, v => lsSet('lmo:targetFolder', v));
-watch(selectedArchitectures, v => lsSet('lmo:selectedArchs', v), {deep: true});
 
-const showInfo = ref(false);
+const pickSource = async () => {
+  const f = await window.electronAPI?.selectFolder();
+  if (f) sourceFolder.value = f;
+};
+const pickTarget = async () => {
+  const f = await window.electronAPI?.selectFolder();
+  if (f) targetFolder.value = f;
+};
+
+const openFolder = async (folderPath) => {
+  if (folderPath && window.electronAPI?.openFolder) {
+    await window.electronAPI.openFolder(folderPath);
+  }
+};
+
+const selectedArchitectures = ref(lsGet('lmo:selectedArchs', [...ALL_ARCHS]));
+const showInfo     = ref(false);
 const dropdownOpen = ref(false);
-const archSearch = ref('');
-const dropdownRef = ref(null);
+const archSearch   = ref('');
+const dropdownRef  = ref(null);
+
+watch(selectedArchitectures, v => lsSet('lmo:selectedArchs', v), { deep: true });
 
 const filteredArchs = computed(() => {
   const q = archSearch.value.trim().toLowerCase();
@@ -79,51 +98,118 @@ const selectionSummary = computed(() => {
   if (n === 1) return selectedArchitectures.value[0];
   return `${n} of ${t} selected`;
 });
-const allSelected = computed(() => selectedArchitectures.value.length === ALL_ARCHS.length);
+const allSelected  = computed(() => selectedArchitectures.value.length === ALL_ARCHS.length);
 const noneSelected = computed(() => selectedArchitectures.value.length === 0);
 
-const selectAll = () => {
-  selectedArchitectures.value = [...ALL_ARCHS];
-};
-const clearAll = () => {
-  selectedArchitectures.value = [];
-};
+const selectAll  = () => { selectedArchitectures.value = [...ALL_ARCHS]; };
+const clearAll   = () => { selectedArchitectures.value = []; };
 const toggleArch = (a) => {
   const i = selectedArchitectures.value.indexOf(a);
-  if (i === -1) selectedArchitectures.value.push(a); else selectedArchitectures.value.splice(i, 1);
+  if (i === -1) selectedArchitectures.value.push(a);
+  else selectedArchitectures.value.splice(i, 1);
 };
 const isSelected = (a) => selectedArchitectures.value.includes(a);
 
-const onKeydown = (e) => {
-  if (e.key === 'Escape') dropdownOpen.value = false;
-};
-const onClickOutside = (e) => {
-  if (dropdownRef.value && !dropdownRef.value.contains(e.target)) dropdownOpen.value = false;
-};
+const onKeydown      = (e) => { if (e.key === 'Escape') dropdownOpen.value = false; };
+const onClickOutside = (e) => { if (dropdownRef.value && !dropdownRef.value.contains(e.target)) dropdownOpen.value = false; };
 
 onMounted(() => {
   document.addEventListener('mousedown', onClickOutside);
-  document.addEventListener('keydown', onKeydown);
+  document.addEventListener('keydown',   onKeydown);
 });
 onUnmounted(() => {
   document.removeEventListener('mousedown', onClickOutside);
-  document.removeEventListener('keydown', onKeydown);
+  document.removeEventListener('keydown',   onKeydown);
+  clearInterval(stopwatchTimerRef);
+  clearInterval(progressTimerRef);
 });
 
-const pickSource = async () => {
-  const f = await window.electronAPI?.selectFolder();
-  if (f) sourceFolder.value = f;
-};
-const pickTarget = async () => {
-  const f = await window.electronAPI?.selectFolder();
-  if (f) targetFolder.value = f;
-};
+const elapsedMs  = ref(0);
+const stopwatchActive = ref(false);
+let stopwatchStart   = 0;
+let stopwatchTimerRef = null;
+
+const elapsedFormatted = computed(() => {
+  const totalSec = Math.floor(elapsedMs.value / 1000);
+  const h   = Math.floor(totalSec / 3600);
+  const m   = Math.floor((totalSec % 3600) / 60);
+  const sec = totalSec % 60;
+  const mm  = String(m).padStart(2, '0');
+  const ss  = String(sec).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+});
+
+const progressPct      = ref(0);
+const progressDone     = ref(false);
+const progressLabel    = ref('');
+const progressVisible  = computed(() => props.isProcessing || progressDone.value);
+let progressTimerRef   = null;
+let resetTimeoutRef    = null;
+
+const PROGRESS_POLL_MS   = 300;
+const SCAN_FILL_TARGET   = 8;
+const SCAN_FILL_STEP     = 0.4;
+
+async function pollProgress() {
+  try {
+    const res  = await fetch(`${props.apiBase}/api/progress`);
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const { processed, total } = data;
+
+    if (total > 0) {
+      const real = (processed / total) * 100;
+      progressPct.value   = Math.max(progressPct.value, Math.min(real, 99));
+      progressLabel.value = `${processed} / ${total} groups`;
+    } else {
+      if (progressPct.value < SCAN_FILL_TARGET) {
+        progressPct.value = Math.min(progressPct.value + SCAN_FILL_STEP, SCAN_FILL_TARGET);
+      }
+      progressLabel.value = 'Scanning...';
+    }
+  } catch {
+  }
+}
+
+watch(() => props.isProcessing, (processing) => {
+  if (processing) {
+    clearTimeout(resetTimeoutRef);
+
+    elapsedMs.value       = 0;
+    stopwatchActive.value = true;
+    stopwatchStart        = Date.now();
+    stopwatchTimerRef = setInterval(() => {
+      elapsedMs.value = Date.now() - stopwatchStart;
+    }, 100);
+
+    progressPct.value   = 0;
+    progressDone.value  = false;
+    progressLabel.value = 'Scanning...';
+    progressTimerRef = setInterval(pollProgress, PROGRESS_POLL_MS);
+
+  } else if (stopwatchActive.value) {
+    clearInterval(stopwatchTimerRef);
+    stopwatchActive.value = false;
+    elapsedMs.value = Date.now() - stopwatchStart;
+
+    clearInterval(progressTimerRef);
+    progressPct.value   = 100;
+    progressLabel.value = '';
+    progressDone.value  = true;
+
+    resetTimeoutRef = setTimeout(() => {
+      progressDone.value = false;
+      progressPct.value  = 0;
+    }, 4000);
+  }
+});
 
 const handleExecute = () => {
   emit('start-organize', {
-    sourceDirectory: sourceFolder.value,
-    targetDirectory: targetFolder.value,
-    allowedArchitectures: selectedArchitectures.value
+    sourceDirectory:      sourceFolder.value,
+    targetDirectory:      targetFolder.value,
+    allowedArchitectures: selectedArchitectures.value,
   });
 };
 </script>
@@ -141,9 +227,17 @@ const handleExecute = () => {
     <div class="form-group">
       <label class="form-label">Source Directory <span class="label-hint">unorganized models</span></label>
       <div class="input-row">
-        <input class="glass-input" type="text" readonly :value="sourceFolder" placeholder="Select source folder…"/>
-        <button class="secondary-btn" @click="pickSource" :disabled="isProcessing"><i class="pi pi-folder-open"></i>
-          Browse
+        <input class="glass-input" type="text" readonly :value="sourceFolder" placeholder="Select source folder..."/>
+        <button class="secondary-btn" @click="pickSource" :disabled="isProcessing">
+          <i class="pi pi-folder-open"></i> Browse
+        </button>
+        <button
+            class="icon-btn"
+            @click="openFolder(sourceFolder)"
+            :disabled="!sourceFolder || isProcessing"
+            title="Open folder in Explorer"
+        >
+          <i class="pi pi-external-link"></i>
         </button>
       </div>
     </div>
@@ -151,9 +245,17 @@ const handleExecute = () => {
     <div class="form-group">
       <label class="form-label">Target Directory <span class="label-hint">organized output</span></label>
       <div class="input-row">
-        <input class="glass-input" type="text" readonly :value="targetFolder" placeholder="Select target folder…"/>
-        <button class="secondary-btn" @click="pickTarget" :disabled="isProcessing"><i class="pi pi-folder-open"></i>
-          Browse
+        <input class="glass-input" type="text" readonly :value="targetFolder" placeholder="Select target folder..."/>
+        <button class="secondary-btn" @click="pickTarget" :disabled="isProcessing">
+          <i class="pi pi-folder-open"></i> Browse
+        </button>
+        <button
+            class="icon-btn"
+            @click="openFolder(targetFolder)"
+            :disabled="!targetFolder || isProcessing"
+            title="Open folder in Explorer"
+        >
+          <i class="pi pi-external-link"></i>
         </button>
       </div>
     </div>
@@ -161,24 +263,29 @@ const handleExecute = () => {
     <div class="form-group">
       <label class="form-label">
         Architectures
-        <span class="label-hint" v-if="!allSelected && !noneSelected">{{
-            selectedArchitectures.length
-          }}/{{ ALL_ARCHS.length }}</span>
+        <span class="label-hint" v-if="!allSelected && !noneSelected">
+          {{ selectedArchitectures.length }}/{{ ALL_ARCHS.length }}
+        </span>
       </label>
       <div class="arch-dropdown" ref="dropdownRef">
-        <button class="arch-trigger glass-input" :class="{ open: dropdownOpen, 'is-none': noneSelected }"
-                @click="dropdownOpen = !dropdownOpen" :disabled="isProcessing" type="button">
+        <button
+            class="arch-trigger glass-input"
+            :class="{ open: dropdownOpen, 'is-none': noneSelected }"
+            @click="dropdownOpen = !dropdownOpen"
+            :disabled="isProcessing"
+            type="button"
+        >
           <span class="arch-trigger-text">{{ selectionSummary }}</span>
-          <span class="arch-trigger-badge" v-if="!allSelected && !noneSelected">{{
-              selectedArchitectures.length
-            }}</span>
+          <span class="arch-trigger-badge" v-if="!allSelected && !noneSelected">
+            {{ selectedArchitectures.length }}
+          </span>
           <svg class="arch-chevron" :class="{ rotated: dropdownOpen }" viewBox="0 0 24 24">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
         </button>
         <div v-if="dropdownOpen" class="arch-panel glass-panel">
           <div class="arch-panel-header">
-            <input v-model="archSearch" class="arch-search glass-input" placeholder="Search…" autofocus/>
+            <input v-model="archSearch" class="arch-search glass-input" placeholder="Search..." autofocus/>
             <div class="arch-bulk-actions">
               <button class="link-btn" @click="selectAll" :disabled="allSelected">All</button>
               <span class="bulk-divider">·</span>
@@ -186,8 +293,13 @@ const handleExecute = () => {
             </div>
           </div>
           <ul class="arch-list">
-            <li v-for="arch in filteredArchs" :key="arch" class="arch-item" :class="{ selected: isSelected(arch) }"
-                @click="toggleArch(arch)">
+            <li
+                v-for="arch in filteredArchs"
+                :key="arch"
+                class="arch-item"
+                :class="{ selected: isSelected(arch) }"
+                @click="toggleArch(arch)"
+            >
               <span class="arch-check">
                 <svg v-if="isSelected(arch)" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
               </span>
@@ -216,9 +328,31 @@ const handleExecute = () => {
       </label>
     </div>
 
+    <transition name="progress-fade">
+      <div v-if="progressVisible" class="progress-section">
+        <div class="progress-header">
+          <span class="progress-label">
+            <i class="pi" :class="progressDone ? 'pi-check-circle' : 'pi-spin pi-spinner'"></i>
+            {{ progressDone ? 'Done' : (progressLabel || 'Organizing...') }}
+          </span>
+          <span class="stopwatch" :class="{ 'stopwatch-done': progressDone }">
+            <i class="pi pi-stopwatch"></i>
+            {{ elapsedFormatted }}
+          </span>
+        </div>
+        <div class="progress-track">
+          <div
+              class="progress-fill"
+              :class="{ 'progress-done': progressDone, 'progress-active': isProcessing }"
+              :style="{ width: progressPct.toFixed(1) + '%' }"
+          ></div>
+        </div>
+      </div>
+    </transition>
+
     <button class="primary-btn" @click="handleExecute" :disabled="isProcessing">
       <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-sort-alt'"></i>
-      {{ isProcessing ? 'Organizing…' : 'Start Organization' }}
+      {{ isProcessing ? 'Organizing...' : 'Start Organization' }}
     </button>
 
     <button
@@ -240,3 +374,134 @@ const handleExecute = () => {
 
   </div>
 </template>
+
+<style scoped>
+.icon-btn {
+  flex-shrink: 0;
+  display:     inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.icon-btn:hover:not(:disabled) {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  background: var(--bg-hover);
+}
+
+.icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 0 2px;
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.progress-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.progress-label .pi-check-circle {
+  color: var(--status-success);
+}
+
+.stopwatch {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  transition: color 0.3s;
+}
+
+.stopwatch-done {
+  color: var(--status-success);
+  font-weight: 700;
+}
+
+.progress-track {
+  width: 100%;
+  height: 5px;
+  background: var(--bg-input);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border-input);
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--grad-hover, linear-gradient(90deg, var(--accent-primary), var(--accent-secondary, var(--accent-primary))));
+  transition: width 0.3s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-fill.progress-active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.28) 50%,
+      transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+.progress-fill.progress-done {
+  background: var(--status-success, #22c55e);
+  transition: width 0.25s ease-in, background 0.3s ease;
+}
+
+.progress-fill.progress-done::after {
+  display: none;
+}
+
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.progress-fade-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.progress-fade-leave-active {
+  transition: opacity 0.6s ease, transform 0.4s ease;
+}
+.progress-fade-enter-from,
+.progress-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+</style>
