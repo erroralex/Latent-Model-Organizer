@@ -60,6 +60,8 @@ Engineered from the ground up for power users managing terabytes of models, prio
 * **Dry Run Mode:** Test your organization parameters safely. The app will calculate hashes, read headers, and output exactly what *would* happen to the console without moving a single file.
 * **Deep Scanning:** Toggle recursive scanning to organize models buried deep within nested subfolders.
 * **Non-Destructive Grouping:** Associated files (e.g., `model_v1.safetensors`, `model_v1.preview.png`, `model_v1.civitai.info`) are safely bundled and moved as atomic units.
+* **Smart Collision Handling:** If a model with the same name already exists in the target folder, the app safely renames the incoming model and *all* of its associated sidecars (e.g., `model (1).safetensors`) to guarantee zero data loss.
+* **Transactional Restores:** An automated `undo-manifest.json` tracks every move, allowing you to instantly revert thousands of files back to their exact original locations.
 
 ---
 

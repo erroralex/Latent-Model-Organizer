@@ -48,6 +48,8 @@ const parseLogLine = (raw) => {
 };
 
 const connect = () => {
+  if (!props.apiBase) return;
+
   const url = `${props.apiBase}/api/logs`;
   eventSource = new EventSource(url);
 
@@ -58,19 +60,22 @@ const connect = () => {
   eventSource.onerror = (err) => {
     console.warn('SSE error, reconnecting…', err);
     eventSource.close();
+    eventSource = null;
     setTimeout(connect, 5000);
   };
 
-  flushInterval = setInterval(() => {
-    if (logBuffer.length > 0) {
-      logs.value.push(...logBuffer);
-      logBuffer = [];
+  if (!flushInterval) {
+    flushInterval = setInterval(() => {
+      if (logBuffer.length > 0) {
+        logs.value.push(...logBuffer);
+        logBuffer = [];
 
-      if (logs.value.length > 1000) {
-        logs.value.splice(0, logs.value.length - 1000);
+        if (logs.value.length > 1000) {
+          logs.value.splice(0, logs.value.length - 1000);
+        }
       }
-    }
-  }, 100);
+    }, 100);
+  }
 };
 
 const clearLogs = () => {
@@ -87,6 +92,12 @@ const scrollToBottom = () => {
     consoleRef.value.scrollTop = consoleRef.value.scrollHeight;
   }
 };
+
+watch(() => props.apiBase, (newVal) => {
+  if (newVal && !eventSource) {
+    connect();
+  }
+});
 
 watch(logs, () => nextTick(scrollToBottom), { deep: true });
 

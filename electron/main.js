@@ -5,22 +5,6 @@
  * services not accessible to the web-based renderer process. It manages the
  * application lifecycle, native window orchestration, and cross-process
  * communication (IPC).
- *
- * Core Responsibilities:
- * - Native Orchestration: Configures and manages the frameless BrowserWindow,
- *   injecting the secure preload bridge for frontend communication.
- * - Dynamic Port Handshake: Resolves the Java backend's ephemeral port by
- *   parsing its stdout stream (primary) or polling a temp file (fallback),
- *   then exposes the port to the renderer via IPC so the Vue frontend can
- *   construct its API base URL without any hardcoded port numbers.
- * - IPC Gateway: Handles requests for native OS features including folder
- *   selection dialogs and opening external URLs in the default system browser.
- * - Window Management: Implements manual handlers for custom title bar controls
- *   (minimize, maximize, close) consistent with the glassmorphic UI design.
- * - Resource Sanitisation: Executes a coordinated shutdown sequence that
- *   notifies the Java backend, force-kills the Vite dev server via the
- *   cross-platform `kill-port` package, and forcefully terminates the process
- *   tree to ensure a clean system state upon exit.
  */
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
@@ -32,6 +16,7 @@ const fs = require('fs');
 const isDev = !app.isPackaged;
 let backendProcess = null;
 let backendPort = null;
+let isQuitting = false;
 const PORT_FILE_PATH = path.join(os.tmpdir(), '.lmo-port');
 
 function getBackendPaths() {
@@ -41,8 +26,10 @@ function getBackendPaths() {
 
     const rootDir = path.join(process.resourcesPath, '..', 'runtime');
     const binName = process.platform === 'win32' ? 'java.exe' : 'java';
+    const javaDir = process.platform === 'darwin' ? path.join('Contents', 'Home', 'bin') : 'bin';
+
     return {
-        javaPath: path.join(rootDir, 'bin', binName),
+        javaPath: path.join(rootDir, javaDir, binName),
         jarPath: path.join(rootDir, 'app', 'backend.jar'),
     };
 }
@@ -91,6 +78,14 @@ function startBackend() {
         };
 
         if (isDev) {
+            try {
+                if (fs.existsSync(PORT_FILE_PATH)) {
+                    fs.unlinkSync(PORT_FILE_PATH);
+                    console.log('[main] Stale port file deleted.');
+                }
+            } catch (err) {
+                console.warn('[main] Could not delete stale port file:', err.message);
+            }
             console.log('[main] Dev mode - waiting for external backend port file...');
             startFilePoll();
             return;
@@ -151,7 +146,6 @@ function createWindow() {
     });
 
     if (isDev) {
-        console.log('[main] Loading development URL...');
         mainWindow.loadURL('http://localhost:5173');
     } else {
         const indexPath = path.join(__dirname, '../frontend/dist/index.html');
@@ -212,56 +206,52 @@ app.whenReady().then(async () => {
     });
 });
 
-app.on('before-quit', async () => {
+app.on('before-quit', async (event) => {
+    if (isQuitting) return;
+
+    event.preventDefault();
+    isQuitting = true;
+
     console.log('[main] App quitting - initiating cleanup...');
 
     const shutdownUrl = `http://localhost:${backendPort}/api/shutdown`;
 
-    if (backendProcess) {
-        try {
-            await fetch(shutdownUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            });
-        } catch {
-            backendProcess.kill();
-        }
-    } else if (isDev) {
-        try {
-            await fetch(shutdownUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            });
-        } catch {
-        }
+    try {
+        await fetch(shutdownUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        console.log('[main] Backend shutdown signal sent.');
+    } catch (err) {
+        console.warn('[main] Could not send shutdown signal to backend:', err.message);
+        if (backendProcess) backendProcess.kill();
     }
 
     try {
         if (fs.existsSync(PORT_FILE_PATH)) {
             fs.unlinkSync(PORT_FILE_PATH);
+            console.log('[main] Port file deleted.');
         }
-    } catch {
+    } catch (err) {
+        console.warn('[main] Could not delete port file:', err.message);
     }
+
+    if (isDev) {
+        try {
+            const killPort = require('kill-port');
+            await killPort(5173);
+            console.log('[main] Vite dev server on port 5173 terminated.');
+        } catch (err) {
+            console.warn('[main] Could not kill Vite process:', err.message);
+        }
+    }
+
+    console.log('[main] Cleanup complete. Finalizing quit.');
+    app.quit();
 });
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
     }
-});
-
-app.on('will-quit', async () => {
-    if (!isDev) return;
-
-    try {
-        const killPort = require('kill-port');
-        await killPort(5173);
-        console.log('[main] Vite dev server on port 5173 terminated.');
-    } catch (err) {
-        if (err.code !== 'MODULE_NOT_FOUND') {
-            console.warn('[main] Could not kill Vite process (may already be stopped):', err.message);
-        }
-    }
-
-    process.exit(0);
 });
