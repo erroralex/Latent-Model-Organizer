@@ -248,7 +248,7 @@ const closeReport = () => {
         </div>
 
         <transition name="drawer">
-          <ConsoleWindow v-if="consoleOpen" class="console-drawer"/>
+          <ConsoleWindow v-if="consoleOpen" :apiBase="apiBase" class="console-drawer"/>
         </transition>
       </main>
     </div>

@@ -50,23 +50,21 @@ jobs:
         working-directory: ./electron
         run: npm ci
 
-      # Prepare the runtime folder structure expected by electron-builder
+      # Prepare the runtime folder structure
       - name: Prepare Runtime Directory
         shell: bash
         run: |
           mkdir -p electron/runtime/app
-          mkdir -p electron/runtime/bin
-          # Ensure backend.jar exists - the POM defines the final name
-          # We'll use a wildcard to be safe or ensure maven names it specifically
-          cp backend/target/backend-*.jar electron/runtime/app/backend.jar
+          # Copy the exact jar name specified in pom.xml finalName
+          cp backend/target/backend.jar electron/runtime/app/backend.jar
 
-      # Bundle a custom JRE using jlink
+      # Bundle a custom JRE using jlink directly into the runtime folder
       - name: Create Custom JRE
         shell: bash
         run: |
           "$JAVA_HOME/bin/jlink" \
-            --add-modules java.base,java.net.http,java.logging,jdk.crypto.ec \
-            --output electron/runtime/jre \
+            --add-modules java.base,java.net.http,java.logging,jdk.crypto.ec,jdk.unsupported \
+            --output electron/runtime \
             --strip-debug \
             --no-man-pages \
             --no-header-files \
@@ -76,6 +74,9 @@ jobs:
         working-directory: ./electron
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Uncomment and add to repository secrets if distributing for macOS
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
         run: npm run dist
 
       - name: Upload Artifacts

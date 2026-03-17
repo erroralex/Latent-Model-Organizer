@@ -32,7 +32,7 @@ import java.security.NoSuchAlgorithmException;
  */
 public final class HashUtil {
 
-    private static final int BUFFER_SIZE = 8192;
+    private static final int BUFFER_SIZE = 1024 * 1024 * 4;
 
     private HashUtil() {
     }

@@ -24,31 +24,33 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * <p>The {@code OrganizationService} is the primary orchestration layer for the Latent Model Organizer.
- * It implements a sophisticated, multi-pass grouping and relocation engine designed to manage
- * massive machine learning model libraries with high precision and performance.</p>
+ * <p>The {@code OrganizationService} is the core engine of the Latent Model Organizer, responsible for the
+ * systematic classification, grouping, and relocation of machine learning model files. It is engineered
+ * to handle massive libraries by treating related files (weights, configs, previews) as atomic "model units".</p>
  *
- * <p>Key Functional Pillars:
+ * <h3>Core Capabilities:</h3>
  * <ul>
- *   <li><b>Intelligent Grouping:</b> Employs advanced stem analysis and prefix matching to associate
- *   primary model weights ({@code .safetensors}) with their heterogeneous sidecar files (previews,
- *   configs, metadata), ensuring atomic relocations of entire model "units".</li>
- *   <li><b>Concurrent Execution:</b> Leverages Java 21 Virtual Threads to parallelize I/O-intensive
- *   filesystem operations. This allows for near-instantaneous sorting of libraries containing
- *   thousands of files while maintaining low memory overhead.</li>
- *   <li><b>State Management & Undo:</b> Automatically generates a lightweight {@link UndoManifest}
- *   after every real organization run. This manifest allows for full, bit-perfect restoration
- *    of the previous filesystem state via a parallelized reverse-move operation.</li>
- *   <li><b>Metadata Enrichment:</b> Integrates with {@link ModelAnalyzer} and external APIs to
- *   fill gaps in local metadata, ensuring models are categorized correctly even when local
- *   information is sparse.</li>
+ *   <li><b>Advanced Prefix Analysis:</b> Implements a sophisticated grouping algorithm that uses stem
+ *   analysis and version-suffix stripping to associate disparate files (e.g., .safetensors, .yaml, .png)
+ *   belonging to the same model.</li>
+ *   <li><b>Virtual Thread Parallelism:</b> Utilizes Java 21's {@code Virtual Threads} to maximize I/O
+ *   throughput during filesystem scanning and file relocation, ensuring high performance even on
+ *   high-latency storage.</li>
+ *   <li><b>Atomic Relocation & Collision Safety:</b> Employs a non-destructive relocation strategy with
+ *   automatic OS-style renaming (e.g., "model (1)") to prevent data loss. It ensures all members of a
+ *   model group are renamed consistently to maintain sidecar integrity.</li>
+ *   <li><b>Transactional Undo System:</b> Generates a detailed {@link UndoManifest} for every operation,
+ *   allowing users to revert organizational changes with bit-perfect accuracy using a parallelized
+ *   reverse-move execution.</li>
+ *   <li><b>Metadata Enrichment:</b> Integrates with external providers (e.g., Civitai) to fetch missing
+ *   model hashes, metadata, and preview images, filling gaps in local data to improve classification.</li>
  * </ul>
- * </p>
  *
- * <p>This service operates as a thread-safe, stateless component (relying on local operation state),
- * facilitating reliable use within a high-concurrency server environment.</p>
+ * <p>The service is designed as a stateless, thread-safe component, making it suitable for high-concurrency
+ * environments where multiple organization tasks might be queued or requested simultaneously.</p>
  *
  * @see ModelAnalyzer
+ * @see CivitaiApiClient
  * @see UndoManifest
  */
 public class OrganizationService {
@@ -155,7 +157,6 @@ public class OrganizationService {
 
         logger.info("Undoing sort from {}. Reversing {} file moves.", manifest.timestamp(), manifest.moveCount());
 
-        ConcurrentHashMap<String, AtomicInteger> stats = new ConcurrentHashMap<>();
         CopyOnWriteArrayList<String> errors = new CopyOnWriteArrayList<>();
         AtomicInteger restored = new AtomicInteger(0);
 
@@ -177,7 +178,7 @@ public class OrganizationService {
             }
         }
 
-        pruneEmptyArchitectureDirs(targetDir, errors);
+        pruneEmptyArchitectureDirs(targetDir);
 
         try {
             Files.deleteIfExists(manifestPath);
@@ -192,10 +193,6 @@ public class OrganizationService {
         return new OperationReport(
                 String.format("Undo complete. %d file(s) restored to their original locations.", restoredCount),
                 finalStats, new ArrayList<>(errors), restoredCount, 0);
-    }
-
-    public boolean canUndo(Path targetDir) {
-        return Files.exists(targetDir.resolve(UNDO_MANIFEST_FILENAME));
     }
 
     public OperationReport fetchMissingMetadata(Path targetDir, boolean isRecursive, boolean isDryRun) {
@@ -301,7 +298,7 @@ public class OrganizationService {
         }
     }
 
-    private void pruneEmptyArchitectureDirs(Path targetDir, CopyOnWriteArrayList<String> errors) {
+    private void pruneEmptyArchitectureDirs(Path targetDir) {
         try (Stream<Path> dirs = Files.list(targetDir)) {
             dirs.filter(Files::isDirectory)
                     .filter(d -> !d.getFileName().toString().equals("."))
@@ -405,19 +402,19 @@ public class OrganizationService {
     private void processGroup(String groupKey, List<Path> files, Path targetDir, Set<String> allowedSet, boolean isDryRun,
                               ConcurrentHashMap<String, AtomicInteger> stats, CopyOnWriteArrayList<String> errors,
                               ConcurrentLinkedQueue<MoveRecord> moveLog, ConcurrentHashMap<Path, Boolean> createdDirs) {
-        String baseName = Path.of(groupKey).getFileName().toString().trim();
+        String originalBaseName = Path.of(groupKey).getFileName().toString().trim();
         String dryRunPrefix = isDryRun ? "[DRY RUN] " : "";
 
         try {
-            String architecture = resolveArchitecture(baseName, files).trim();
+            String architecture = resolveArchitecture(files).trim();
 
             if (!allowedSet.isEmpty() && !allowedSet.contains(architecture.toLowerCase(Locale.ROOT))) {
-                logger.debug("Skipping group '{}' (architecture '{}' not in allowed list).", baseName, architecture);
+                logger.debug("Skipping group '{}' (architecture '{}' not in allowed list).", originalBaseName, architecture);
                 return;
             }
 
             if (files.stream().allMatch(f -> isInArchitectureDir(f, targetDir, architecture))) {
-                logger.debug("Skipping group '{}' — all files already in '{}'.", baseName, architecture);
+                logger.debug("Skipping group '{}' — all files already in '{}'.", originalBaseName, architecture);
                 return;
             }
 
@@ -433,8 +430,19 @@ public class OrganizationService {
                 });
             }
 
+            String targetBaseName = resolveCollisionFreeBaseName(architectureDir, originalBaseName, files);
+
+            if (!originalBaseName.equals(targetBaseName)) {
+                logger.info("Collision detected for group '{}'. Renaming to '{}' to prevent data loss.", originalBaseName, targetBaseName);
+            }
+
             for (Path file : files) {
-                Path targetPath = architectureDir.resolve(file.getFileName().toString().trim());
+                String originalFileName = file.getFileName().toString();
+                String extension = getExtension(originalFileName, originalBaseName);
+
+                String newFileName = targetBaseName + extension;
+                Path targetPath = architectureDir.resolve(newFileName);
+                
                 if (!file.toAbsolutePath().equals(targetPath.toAbsolutePath())) {
                     if (!isDryRun) {
                         Files.move(file, targetPath, StandardCopyOption.REPLACE_EXISTING);
@@ -446,21 +454,62 @@ public class OrganizationService {
                 }
             }
 
-            logger.info("{}{}", dryRunPrefix, String.format("Moved group '%s' (%d files) → '%s'", baseName, files.size(), architecture));
+            logger.info("{}{}", dryRunPrefix, String.format("Moved group '%s' (%d files) → '%s'", targetBaseName, files.size(), architecture));
             stats.computeIfAbsent(architecture, k -> new AtomicInteger(0)).incrementAndGet();
 
         } catch (IOException e) {
-            String msg = String.format("IO error processing group '%s': %s", baseName, e.getMessage());
+            String msg = String.format("IO error processing group '%s': %s", originalBaseName, e.getMessage());
             logger.error(msg, e);
             errors.add(msg);
         } catch (Exception e) {
-            String msg = String.format("Unexpected error processing group '%s': %s", baseName, e.getMessage());
+            String msg = String.format("Unexpected error processing group '%s': %s", originalBaseName, e.getMessage());
             logger.error(msg, e);
             errors.add(msg);
         }
     }
 
-    private String resolveArchitecture(String baseName, List<Path> files) {
+    private String getExtension(String originalFileName, String baseName) {
+        int dotIndex = originalFileName.indexOf('.', baseName.length());
+        if (dotIndex != -1) {
+            return originalFileName.substring(dotIndex);
+        } else if (originalFileName.length() > baseName.length()) {
+             return originalFileName.substring(baseName.length());
+        }
+        return "";
+    }
+
+    private String resolveCollisionFreeBaseName(Path architectureDir, String originalBaseName, List<Path> files) {
+        String currentBaseName = originalBaseName;
+        int counter = 1;
+
+        while (true) {
+            boolean collision = false;
+            for (Path file : files) {
+                String originalFileName = file.getFileName().toString();
+                String extension = getExtension(originalFileName, originalBaseName);
+
+                String testFileName = currentBaseName + extension;
+                Path testPath = architectureDir.resolve(testFileName);
+
+                // If the file already exists at the target, and it's NOT the exact same file
+                // we are trying to move (e.g., it's already in the correct architecture dir),
+                // we have a collision.
+                if (Files.exists(testPath) && !file.toAbsolutePath().normalize().equals(testPath.toAbsolutePath().normalize())) {
+                    collision = true;
+                    break;
+                }
+            }
+
+            if (!collision) {
+                return currentBaseName;
+            }
+
+            currentBaseName = originalBaseName + " (" + counter + ")";
+            counter++;
+        }
+    }
+
+    private String resolveArchitecture(List<Path> files) {
         Optional<Path> modelFile = files.stream()
                 .filter(p -> p.toString().toLowerCase().endsWith(".safetensors"))
                 .findFirst();
@@ -529,7 +578,8 @@ public class OrganizationService {
         JsonNode images = rootNode.path("images");
         if (!images.isArray() || images.isEmpty()) return;
 
-        String imageUrl = images.get(0).path("url").asText(null);
+        JsonNode urlNode = images.get(0).path("url");
+        String imageUrl = urlNode.isMissingNode() ? null : urlNode.asText();
         if (imageUrl == null || imageUrl.isBlank()) return;
 
         String extension = resolvePreviewExtension(imageUrl);

@@ -1,26 +1,36 @@
 <script setup>
 /**
- * CONSOLEWINDOW.VUE
+ * CONSOLE WINDOW COMPONENT
  *
- * A real-time log propagation console for backend monitoring.
- * This component establishes a persistent Server-Sent Events (SSE) bridge to the
- * Java backend, streaming internal SLF4J logs directly into a terminal interface.
+ * This component provides a real-time, terminal-like interface for monitoring backend activity.
+ * It establishes a persistent Server-Sent Events (SSE) connection to the Java backend,
+ * streaming SLF4J log entries directly to the UI with minimal overhead.
  *
- * DIAGNOSTIC CAPABILITIES:
- * - Semantic Highlighting: Dynamically maps log levels (INFO, WARN, ERROR, DEBUG) to specific colors for rapid troubleshooting.
- * - Rolling Buffer: Maintains a maximum history of 1000 entries to optimize memory performance during long sessions.
- * - Interactive Controls: Includes auto-scroll toggling and log clearing functionality for focused inspection.
- * - Resilient Connection: Implements automatic reconnection logic with exponential backoff for the SSE stream.
- *
- * @see SseLogAppender.java
- * @see LogStreamHandler.java
+ * Key Features:
+ * - High-Performance Log Streaming: Uses a dual-buffer strategy (raw buffer + periodic flush)
+ *   to ensure smooth UI updates even during high-frequency log bursts without blocking the main thread.
+ * - Semantic Level Highlighting: Automatically parses log levels (INFO, WARN, ERROR, DEBUG)
+ *   and applies appropriate color coding for rapid visual diagnostics.
+ * - Memory Management: Implements a rolling window that maintains a maximum of 1000 entries,
+ *   preventing memory leaks and DOM bloat during long-running operations.
+ * - Connection Resilience: Features automatic reconnection logic with exponential backoff
+ *   to handle transient network failures or backend restarts.
+ * - User Controls: Provides interactive features including auto-scroll locking and
+ *   instant history clearing for focused log inspection.
  */
-import {ref, onMounted, onUnmounted, nextTick, watch} from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
+
+const props = defineProps({
+  apiBase: { type: String, required: true }
+});
 
 const logs = ref([]);
 const consoleRef = ref(null);
 const isAutoScroll = ref(true);
+
 let eventSource = null;
+let logBuffer = [];
+let flushInterval = null;
 
 const LEVEL_COLORS = {
   INFO: '#c9d1d9',
@@ -34,37 +44,58 @@ const parseLogLine = (raw) => {
   const parts = raw.split(' ');
   const level = parts[1]?.trim().toUpperCase() || 'INFO';
   const color = LEVEL_COLORS[level] ?? LEVEL_COLORS.INFO;
-  return {text: raw, level, color};
+  return { text: raw, level, color };
 };
 
 const connect = () => {
-  const url = (window.location?.hostname === 'localhost') ? '/api/logs' : 'http://localhost:8080/api/logs';
+  const url = `${props.apiBase}/api/logs`;
   eventSource = new EventSource(url);
 
-  eventSource.onmessage = ({data}) => {
-    logs.value.push(parseLogLine(data));
-    if (logs.value.length > 1000) logs.value.shift();
+  eventSource.onmessage = ({ data }) => {
+    logBuffer.push(parseLogLine(data));
   };
+
   eventSource.onerror = (err) => {
     console.warn('SSE error, reconnecting…', err);
     eventSource.close();
     setTimeout(connect, 5000);
   };
+
+  flushInterval = setInterval(() => {
+    if (logBuffer.length > 0) {
+      logs.value.push(...logBuffer);
+      logBuffer = [];
+
+      if (logs.value.length > 1000) {
+        logs.value.splice(0, logs.value.length - 1000);
+      }
+    }
+  }, 100);
 };
 
 const clearLogs = () => {
   logs.value = [];
+  logBuffer = [];
 };
+
 const toggleAutoScroll = () => {
   isAutoScroll.value = !isAutoScroll.value;
 };
+
 const scrollToBottom = () => {
-  if (consoleRef.value && isAutoScroll.value) consoleRef.value.scrollTop = consoleRef.value.scrollHeight;
+  if (consoleRef.value && isAutoScroll.value) {
+    consoleRef.value.scrollTop = consoleRef.value.scrollHeight;
+  }
 };
 
-watch(logs, () => nextTick(scrollToBottom), {deep: true});
+watch(logs, () => nextTick(scrollToBottom), { deep: true });
+
 onMounted(connect);
-onUnmounted(() => eventSource?.close());
+
+onUnmounted(() => {
+  eventSource?.close();
+  clearInterval(flushInterval);
+});
 </script>
 
 <template>
