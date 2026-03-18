@@ -147,7 +147,7 @@ Latent Model Organizer automatically remembers your selected directories, chosen
 
 ## 📜 License
 
-Distributed under the **MIT License**. Free for personal and commercial use.
+Distributed under the **MIT License**. Free for personal use.
 
 ---
 

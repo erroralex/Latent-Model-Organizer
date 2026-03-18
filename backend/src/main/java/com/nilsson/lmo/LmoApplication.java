@@ -61,6 +61,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>{@code POST /api/fetch}    - Retrieves missing sidecar metadata and preview images from external APIs.</li>
  *   <li>{@code GET  /api/logs}     - Server-Sent Events stream for real-time operation logging.</li>
  *   <li>{@code GET  /api/progress} - Real-time polling endpoint for operation status.</li>
+ *   <li>{@code GET  /api/architectures} - Returns the list of supported architectures.</li>
  *   <li>{@code POST /api/shutdown} - Initiates a graceful termination sequence.</li>
  * </ul>
  * </p>
@@ -71,18 +72,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class LmoApplication {
 
     private static final Logger logger = LoggerFactory.getLogger(LmoApplication.class);
-
     public static final String HANDSHAKE_TOKEN = UUID.randomUUID().toString();
-
-    static final String PORT_FILE_PATH =
-            System.getProperty("java.io.tmpdir") + File.separator + ".lmo-port";
-
+    static final String PORT_FILE_PATH = System.getProperty("java.io.tmpdir") + File.separator + ".lmo-port";
     static final AtomicInteger progressTotal = new AtomicInteger(0);
-
     static final AtomicInteger progressProcessed = new AtomicInteger(0);
-
     static volatile boolean progressActive = false;
-
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public static void main(String[] args) {
@@ -95,12 +89,13 @@ public class LmoApplication {
 
             var securityFilter = new SecurityFilter(HANDSHAKE_TOKEN);
 
-            server.createContext("/api/organize", new OrganizeHandler(organizationService)).getFilters().add(securityFilter);
-            server.createContext("/api/undo", new UndoHandler(organizationService)).getFilters().add(securityFilter);
-            server.createContext("/api/fetch", new FetchHandler(organizationService)).getFilters().add(securityFilter);
-            server.createContext("/api/logs", new LogStreamHandler()).getFilters().add(securityFilter);
-            server.createContext("/api/progress", new ProgressHandler()).getFilters().add(securityFilter);
-            server.createContext("/api/shutdown", new ShutdownHandler(server)).getFilters().add(securityFilter);
+            createSecureContext(server, "/api/organize", new OrganizeHandler(organizationService), securityFilter);
+            createSecureContext(server, "/api/undo", new UndoHandler(organizationService), securityFilter);
+            createSecureContext(server, "/api/fetch", new FetchHandler(organizationService), securityFilter);
+            createSecureContext(server, "/api/logs", new LogStreamHandler(), securityFilter);
+            createSecureContext(server, "/api/progress", new ProgressHandler(), securityFilter);
+            createSecureContext(server, "/api/architectures", new ArchitectureHandler(modelAnalyzer), securityFilter);
+            createSecureContext(server, "/api/shutdown", new ShutdownHandler(server), securityFilter);
 
             server.start();
 
@@ -120,6 +115,10 @@ public class LmoApplication {
             logger.error("Failed to start server", e);
             System.exit(1);
         }
+    }
+
+    private static void createSecureContext(HttpServer server, String path, HttpHandler handler, SecurityFilter securityFilter) {
+        server.createContext(path, handler).getFilters().add(securityFilter);
     }
 
     private static void writePortFile(int port, String token) {
@@ -315,6 +314,28 @@ public class LmoApplication {
                     "processed", progressProcessed.get(),
                     "total", progressTotal.get()
             ));
+        }
+    }
+
+    static class ArchitectureHandler implements HttpHandler {
+        private final ModelAnalyzer modelAnalyzer;
+
+        public ArchitectureHandler(ModelAnalyzer modelAnalyzer) {
+            this.modelAnalyzer = modelAnalyzer;
+        }
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            addCorsHeaders(exchange);
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendError(exchange, 405, "Method Not Allowed");
+                return;
+            }
+            sendJson(exchange, 200, modelAnalyzer.getAllArchitectures());
         }
     }
 

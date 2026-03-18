@@ -16,32 +16,27 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.List;
 import java.util.Optional;
 
 /**
- * <p>The {@code ModelAnalyzer} is a specialized engine designed to identify the neural network
- * architecture and associated metadata of machine learning model files. It implements a multi-stage
- * heuristic pipeline that prioritizes local data before falling back to external API lookups.</p>
+ * <p>The {@code ModelAnalyzer} is a specialized analysis engine designed to identify the neural network
+ * architecture and associated metadata of machine learning model files (specifically {@code .safetensors}).</p>
  *
- * <p>Analysis Pipeline Stages:
+ * <p>It implements a multi-stage heuristic pipeline to accurately categorize models:
  * <ol>
- *   <li><b>Sidecar Inspection:</b> Directly reads {@code .civitai.info} sidecar files for authoritative
- *   metadata provided by the user or previous organization runs.</li>
- *   <li><b>Header Parsing:</b> Extracts metadata directly from {@code .safetensors} file headers.
- *   Uses efficient memory-mapped I/O and LITTLE_ENDIAN byte parsing to minimize memory footprint
- *   during scans of massive model files.</li>
- *   <li><b>Filename Heuristics:</b> Applies pattern matching and tokenization to filenames to infer
- *   architecture (e.g., "Flux", "SDXL", "Wan") when internal metadata is missing or ambiguous.</li>
- *   <li><b>External API Lookup:</b> Computes SHA-256 file hashes and queries the Civitai API. Results
- *   are cached locally as sidecar files to optimize subsequent analysis sessions.</li>
+ *   <li><b>Sidecar Analysis:</b> Checks for existing {@code .civitai.info} files containing metadata.</li>
+ *   <li><b>Header Inspection:</b> Performs zero-memory byte parsing of the Safetensors JSON header to extract
+ *   embedded architectural hints or model versions.</li>
+ *   <li><b>Filename Heuristics:</b> Applies complex regex and token matching against the filename if
+ *   internal metadata is missing or ambiguous.</li>
+ *   <li><b>Remote API Lookup:</b> As a final fallback, calculates the SHA-256 hash of the model and
+ *   queries the Civitai API for canonical metadata and preview images.</li>
  * </ol>
  * </p>
  *
- * <p>This engine is crucial for classifying models into a unified set of architectural categories,
- * enabling the {@link OrganizationService} to perform structured library relocations.</p>
- *
- * @see OrganizationService
- * @see CivitaiApiClient
+ * <p>This engine is designed for high-performance and low memory overhead, utilizing {@code FileChannel}
+ * for direct header access without loading multi-gigabyte files into the JVM heap.</p>
  */
 public class ModelAnalyzer {
 
@@ -49,12 +44,31 @@ public class ModelAnalyzer {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private final CivitaiApiClient civitaiApiClient;
 
+    public static final List<String> SUPPORTED_ARCHITECTURES = List.of(
+            "Flux .2 Klein 9B-base", "Flux .2 Klein 9B", "Flux .2 Klein 4B-base", "Flux .2 Klein 4B", "Flux .2 D",
+            "Flux .1 Kontext", "Flux .1 Krea", "Flux .1 S", "Flux .1 D",
+            "Wan Video 2.5 I2V", "Wan Video 2.5 T2V", "Wan Video 2.2 I2V-A14B", "Wan Video 2.2 TI2V-5B",
+            "Wan Video 2.2 T2V-A14B", "Wan Video 14B i2v 720p", "Wan Video 14B i2v 480p", "Wan Video 14B t2v",
+            "Wan Video 1.3B t2v",
+            "SDXL Lightning", "SDXL Hyper", "SDXL Turbo", "SDXL 1.0",
+            "SD 3.5", "SD 2.1", "SD 2.0", "SD 1.5 Hyper", "SD 1.5 LCM", "SD 1.5", "SD 1.4",
+            "Pony V7", "Pony", "Illustrious", "NoobAI", "Sana",
+            "LTXV2", "LTXV", "Mochi", "CogVideoX", "Hunyuan Video", "Hunyuan 1",
+            "HiDream", "PixArt Σ", "PixArt α", "Aura Flow", "Lumina", "Kolors",
+            "Chroma", "Anima", "Qwen", "Z Image Base", "Z Image Turbo",
+            "Uncategorized", "Unknown"
+    );
+
     public ModelAnalyzer() {
         this(new CivitaiApiClient());
     }
 
     public ModelAnalyzer(CivitaiApiClient civitaiApiClient) {
         this.civitaiApiClient = civitaiApiClient;
+    }
+
+    public List<String> getAllArchitectures() {
+        return SUPPORTED_ARCHITECTURES;
     }
 
     public ModelMetadata analyze(Path modelPath) {
@@ -423,7 +437,7 @@ public class ModelAnalyzer {
         if (isZImageBase(upper.toLowerCase())) return "Z Image Base";
         if (isZImageTurbo(upper.toLowerCase())) return "Z Image Turbo";
 
-        return "Unknown";
+        return "Uncategorized";
     }
 
     private static boolean isZImageFamily(String architecture) {
