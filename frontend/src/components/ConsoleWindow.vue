@@ -1,27 +1,25 @@
 <script setup>
 /**
- * CONSOLE WINDOW COMPONENT
+ * ConsoleWindow.vue
  *
  * This component provides a real-time, terminal-like interface for monitoring backend activity.
  * It establishes a persistent Server-Sent Events (SSE) connection to the Java backend,
- * streaming SLF4J log entries directly to the UI with minimal overhead.
+ * streaming SLF4J log entries directly to the UI.
  *
- * Key Features:
- * - High-Performance Log Streaming: Uses a dual-buffer strategy (raw buffer + periodic flush)
- *   to ensure smooth UI updates even during high-frequency log bursts without blocking the main thread.
- * - Semantic Level Highlighting: Automatically parses log levels (INFO, WARN, ERROR, DEBUG)
- *   and applies appropriate color coding for rapid visual diagnostics.
- * - Memory Management: Implements a rolling window that maintains a maximum of 1000 entries,
- *   preventing memory leaks and DOM bloat during long-running operations.
- * - Connection Resilience: Features automatic reconnection logic with exponential backoff
- *   to handle transient network failures or backend restarts.
- * - User Controls: Provides interactive features including auto-scroll locking and
- *   instant history clearing for focused log inspection.
+ * Key Capabilities:
+ * - Dual-buffer Strategy: Uses a raw buffer + periodic flush to ensure smooth UI updates
+ *   even during high-frequency log bursts.
+ * - Semantic Highlighting: Automatically parses log levels (INFO, WARN, ERROR, DEBUG)
+ *   and applies appropriate color coding.
+ * - Rolling Window: Maintains a maximum of 1000 entries to prevent DOM bloat.
+ * - Resilience: Automatic reconnection with exponential backoff for network stability.
+ * - UX: Integrated auto-scroll locking and history clearing.
  */
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 
 const props = defineProps({
-  apiBase: { type: String, required: true }
+  apiBase: { type: String, required: true },
+  apiToken: { type: String, default: '' }
 });
 
 const logs = ref([]);
@@ -50,7 +48,7 @@ const parseLogLine = (raw) => {
 const connect = () => {
   if (!props.apiBase) return;
 
-  const url = `${props.apiBase}/api/logs`;
+  const url = `${props.apiBase}/api/logs?token=${props.apiToken}`;
   eventSource = new EventSource(url);
 
   eventSource.onmessage = ({ data }) => {

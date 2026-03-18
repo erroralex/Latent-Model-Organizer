@@ -2,6 +2,7 @@ package com.nilsson.lmo;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nilsson.lmo.api.LogStreamHandler;
+import com.nilsson.lmo.api.SecurityFilter;
 import com.nilsson.lmo.domain.FetchRequest;
 import com.nilsson.lmo.domain.OperationReport;
 import com.nilsson.lmo.domain.OrganizationRequest;
@@ -16,15 +17,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -37,31 +41,27 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>Architectural Highlights:
  * <ul>
  *   <li><b>Ephemeral Port Allocation:</b> Binds to port {@code 0} so the OS assigns the
- *   first available port at runtime, eliminating {@code BindException} crash-loops when
- *   port 8080 is already in use. The resolved port is signalled to the Electron main
- *   process via a {@code LMO_PORT=} line on {@code stdout} (primary, lowest latency) AND
- *   written to a {@code .lmo-port} file in the OS temp directory as a reliable fallback
- *   IPC mechanism.</li>
+ *   first available port at runtime, eliminating {@code BindException} crash-loops.
+ *   The resolved port is signalled to the Electron process via stdout and a temporary
+ *   port-hint file.</li>
  *   <li><b>Project Loom Integration:</b> Utilises Java 21 Virtual Threads (via
  *   {@code newVirtualThreadPerTaskExecutor()}) to provide exceptional throughput during
  *   parallelised file moves and network requests without blocking OS threads.</li>
  *   <li><b>Restful API Interface:</b> Exposes endpoints for organisation, undo, metadata
  *   retrieval, streaming logging (SSE), and graceful shutdown.</li>
- *   <li><b>Undo/Redo Support:</b> Coordinates with {@link OrganizationService} to manage
- *   persistent undo manifests, allowing robust filesystem state management.</li>
- *   <li><b>Cross-Origin Resource Sharing (CORS):</b> Implements a flexible CORS policy
- *   to facilitate seamless integration with modern frontend frameworks.</li>
+ *   <li><b>Security Integration:</b> Employs a {@link SecurityFilter} to protect all
+ *   endpoints using a cryptographically secure startup token.</li>
  * </ul>
  * </p>
  *
- * <p>API Endpoints:
+ * <p>Standard API Routes:
  * <ul>
  *   <li>{@code POST /api/organize} - Categorises and relocates models based on architectural heuristics.</li>
  *   <li>{@code POST /api/undo}     - Reverses the most recent organisational run using a persistent manifest.</li>
  *   <li>{@code POST /api/fetch}    - Retrieves missing sidecar metadata and preview images from external APIs.</li>
  *   <li>{@code GET  /api/logs}     - Server-Sent Events stream for real-time operation logging.</li>
- *   <li>{@code POST /api/progress} - Provides real-time progress updates for ongoing operations.</li>
- *   <li>{@code POST /api/shutdown} - Initiates a graceful termination of the JVM.</li>
+ *   <li>{@code GET  /api/progress} - Real-time polling endpoint for operation status.</li>
+ *   <li>{@code POST /api/shutdown} - Initiates a graceful termination sequence.</li>
  * </ul>
  * </p>
  *
@@ -72,30 +72,15 @@ public class LmoApplication {
 
     private static final Logger logger = LoggerFactory.getLogger(LmoApplication.class);
 
-    /**
-     * Canonical path of the ephemeral port-hint file.
-     * <p>
-     * Located in the OS temp directory ({@code java.io.tmpdir}) so both the JVM and
-     * the Electron main process can agree on the path without any additional
-     * configuration. The file contains a single integer string (the assigned port)
-     * and is deleted automatically by a JVM shutdown hook on exit.
-     */
+    public static final String HANDSHAKE_TOKEN = UUID.randomUUID().toString();
+
     static final String PORT_FILE_PATH =
             System.getProperty("java.io.tmpdir") + File.separator + ".lmo-port";
 
-    /**
-     * Total number of groups / items to process in the current operation.
-     */
     static final AtomicInteger progressTotal = new AtomicInteger(0);
 
-    /**
-     * Number of groups / items completed so far.
-     */
     static final AtomicInteger progressProcessed = new AtomicInteger(0);
 
-    /**
-     * True while an operation is in flight; false before and after.
-     */
     static volatile boolean progressActive = false;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -105,28 +90,30 @@ public class LmoApplication {
             ModelAnalyzer modelAnalyzer = new ModelAnalyzer();
             OrganizationService organizationService = new OrganizationService(modelAnalyzer);
 
-            HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+            HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
             server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
-            server.createContext("/api/organize", new OrganizeHandler(organizationService));
-            server.createContext("/api/undo", new UndoHandler(organizationService));
-            server.createContext("/api/fetch", new FetchHandler(organizationService));
-            server.createContext("/api/logs", new LogStreamHandler());
-            server.createContext("/api/progress", new ProgressHandler());
-            server.createContext("/api/shutdown", new ShutdownHandler(server));
+            var securityFilter = new SecurityFilter(HANDSHAKE_TOKEN);
+
+            server.createContext("/api/organize", new OrganizeHandler(organizationService)).getFilters().add(securityFilter);
+            server.createContext("/api/undo", new UndoHandler(organizationService)).getFilters().add(securityFilter);
+            server.createContext("/api/fetch", new FetchHandler(organizationService)).getFilters().add(securityFilter);
+            server.createContext("/api/logs", new LogStreamHandler()).getFilters().add(securityFilter);
+            server.createContext("/api/progress", new ProgressHandler()).getFilters().add(securityFilter);
+            server.createContext("/api/shutdown", new ShutdownHandler(server)).getFilters().add(securityFilter);
 
             server.start();
 
             int assignedPort = server.getAddress().getPort();
 
-            System.out.println("LMO_PORT=" + assignedPort);
+            System.out.println("LMO_PORT=" + assignedPort + ":" + HANDSHAKE_TOKEN);
             System.out.flush();
 
-            writePortFile(assignedPort);
+            writePortFile(assignedPort, HANDSHAKE_TOKEN);
 
             Runtime.getRuntime().addShutdownHook(new Thread(LmoApplication::deletePortFile));
 
-            logger.info("Latent Model Organizer Backend started on port {}", assignedPort);
+            logger.info("Latent Model Organizer Backend started on port {} with token {}", assignedPort, HANDSHAKE_TOKEN);
             logger.info("Ready to accept requests at http://localhost:{}", assignedPort);
 
         } catch (IOException e) {
@@ -135,11 +122,13 @@ public class LmoApplication {
         }
     }
 
-    private static void writePortFile(int port) {
-        File portFile = new File(PORT_FILE_PATH);
-        try (FileWriter writer = new FileWriter(portFile)) {
-            writer.write(String.valueOf(port));
-            logger.debug("Port hint written to {}", PORT_FILE_PATH);
+    private static void writePortFile(int port, String token) {
+        try {
+            var tempFile = Paths.get(PORT_FILE_PATH + ".tmp");
+            var actualFile = Paths.get(PORT_FILE_PATH);
+            Files.writeString(tempFile, port + ":" + token, StandardCharsets.UTF_8);
+            Files.move(tempFile, actualFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            logger.debug("Port hint written atomically to {}", PORT_FILE_PATH);
         } catch (IOException e) {
             logger.warn("Could not write port file at {}: {}", PORT_FILE_PATH, e.getMessage());
         }
@@ -308,21 +297,6 @@ public class LmoApplication {
         }
     }
 
-    /**
-     * GET /api/progress
-     * <p>
-     * Returns the current state of the in-flight operation as a lightweight JSON object:
-     * <pre>
-     * {
-     *   "active":    true,   // whether an operation is currently running
-     *   "processed": 14,     // groups / items completed so far
-     *   "total":     42      // total groups / items in this operation
-     * }
-     * </pre>
-     * <p>
-     * The frontend polls this endpoint every ~300 ms while isProcessing is true
-     * to drive a genuinely accurate progress bar.
-     */
     static class ProgressHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -386,7 +360,7 @@ public class LmoApplication {
     private static void addCorsHeaders(HttpExchange exchange) {
         exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
         exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type, Authorization");
     }
 
     private static void sendError(HttpExchange exchange, int statusCode, String message) throws IOException {
