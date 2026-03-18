@@ -6,11 +6,11 @@
  * It manages directory selection, architectural filtering, and execution logic.
  *
  * Key Capabilities:
- * - Native Directory Management: Uses Electron-native dialogs and shell integration.
+ * - Native Directory Management: Uses Electron-native dialogs and shell integration for folder selection.
  * - Architecture Filtering: Searchable multi-select system for targeting specific model types.
  * - Progressive Execution: Toggles between standard, recursive, and simulation (dry run) modes.
  * - Real-time Status: Integrated stopwatch and asymptotic/real progress tracking via API polling.
- * - Undo Support: Direct interface to reverse the last organizational run.
+ * - Undo Support: Direct interface to reverse the last organizational run using persistent manifests.
  */
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
@@ -33,20 +33,7 @@ const lsSet = (k, v) => {
   try { localStorage.setItem(k, JSON.stringify(v)); } catch { }
 };
 
-const ALL_ARCHS = [
-  'Flux .1 S', 'Flux .1 D', 'Flux .1 Krea', 'Flux .1 Kontext', 'Flux .2 D',
-  'Flux .2 Klein 9B', 'Flux .2 Klein 9B-base', 'Flux .2 Klein 4B', 'Flux .2 Klein 4B-base',
-  'SD 1.4', 'SD 1.5', 'SD 1.5 LCM', 'SD 1.5 Hyper', 'SD 2.0', 'SD 2.1', 'SD 3.5',
-  'SDXL 1.0', 'SDXL Lightning', 'SDXL Hyper', 'SDXL Turbo',
-  'Pony', 'Pony V7', 'Illustrious', 'NoobAI',
-  'Wan Video 1.3B t2v', 'Wan Video 14B t2v', 'Wan Video 14B i2v 480p', 'Wan Video 14B i2v 720p',
-  'Wan Video 2.2 TI2V-5B', 'Wan Video 2.2 T2V-A14B', 'Wan Video 2.2 I2V-A14B',
-  'Wan Video 2.5 T2V', 'Wan Video 2.5 I2V',
-  'LTXV', 'LTXV2', 'Mochi', 'CogVideoX', 'Hunyuan 1', 'Hunyuan Video',
-  'Sana', 'HiDream', 'PixArt α', 'PixArt Σ', 'Aura Flow', 'Lumina', 'Kolors',
-  'Chroma', 'Anima', 'Qwen', 'Z Image Turbo', 'Z Image Base',
-  'Uncategorized', 'Unknown',
-];
+const ALL_ARCHS = ref(['Unknown']);
 
 const sourceFolder = ref(lsGet('lmo:sourceFolder', ''));
 const targetFolder = ref(lsGet('lmo:targetFolder', ''));
@@ -69,7 +56,7 @@ const openFolder = async (folderPath) => {
   }
 };
 
-const selectedArchitectures = ref(lsGet('lmo:selectedArchs', [...ALL_ARCHS]));
+const selectedArchitectures = ref(lsGet('lmo:selectedArchs', []));
 const showInfo     = ref(false);
 const dropdownOpen = ref(false);
 const archSearch   = ref('');
@@ -79,20 +66,20 @@ watch(selectedArchitectures, v => lsSet('lmo:selectedArchs', v), { deep: true })
 
 const filteredArchs = computed(() => {
   const q = archSearch.value.trim().toLowerCase();
-  return q ? ALL_ARCHS.filter(a => a.toLowerCase().includes(q)) : ALL_ARCHS;
+  return q ? ALL_ARCHS.value.filter(a => a.toLowerCase().includes(q)) : ALL_ARCHS.value;
 });
 const selectionSummary = computed(() => {
   const n = selectedArchitectures.value.length;
-  const t = ALL_ARCHS.length;
+  const t = ALL_ARCHS.value.length;
   if (n === 0) return 'None selected';
   if (n === t) return 'All architectures';
   if (n === 1) return selectedArchitectures.value[0];
   return `${n} of ${t} selected`;
 });
-const allSelected  = computed(() => selectedArchitectures.value.length === ALL_ARCHS.length);
+const allSelected  = computed(() => selectedArchitectures.value.length === ALL_ARCHS.value.length);
 const noneSelected = computed(() => selectedArchitectures.value.length === 0);
 
-const selectAll  = () => { selectedArchitectures.value = [...ALL_ARCHS]; };
+const selectAll  = () => { selectedArchitectures.value = [...ALL_ARCHS.value]; };
 const clearAll   = () => { selectedArchitectures.value = []; };
 const toggleArch = (a) => {
   const i = selectedArchitectures.value.indexOf(a);
@@ -102,11 +89,40 @@ const toggleArch = (a) => {
 const isSelected = (a) => selectedArchitectures.value.includes(a);
 
 const onKeydown      = (e) => { if (e.key === 'Escape') dropdownOpen.value = false; };
-const onClickOutside = (e) => { if (dropdownRef.value && !dropdownRef.value.contains(e.target)) dropdownOpen.value = false; };
+const onClickOutside = (e) => {
+  const clickedTrigger = dropdownRef.value && dropdownRef.value.contains(e.target);
+  const clickedPanel   = e.target.closest('.arch-panel');
+  if (!clickedTrigger && !clickedPanel) dropdownOpen.value = false;
+};
+
+async function loadArchitectures() {
+  if (!props.apiBase) return;
+  try {
+    const res = await fetch(`${props.apiBase}/api/architectures`, {
+      headers: { 'Authorization': `Bearer ${props.apiToken}` }
+    });
+    if (res.ok) {
+      ALL_ARCHS.value = await res.json();
+      const saved = lsGet('lmo:selectedArchs', []);
+      if (saved.length === 0) {
+        selectedArchitectures.value = [...ALL_ARCHS.value];
+      } else {
+        selectedArchitectures.value = saved.filter(a => ALL_ARCHS.value.includes(a));
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load architectures:', err);
+  }
+}
+
+watch(() => props.apiBase, (newVal) => {
+  if (newVal) loadArchitectures();
+});
 
 onMounted(() => {
   document.addEventListener('mousedown', onClickOutside);
   document.addEventListener('keydown',   onKeydown);
+  if (props.apiBase) loadArchitectures();
 });
 onUnmounted(() => {
   document.removeEventListener('mousedown', onClickOutside);
@@ -114,6 +130,26 @@ onUnmounted(() => {
   clearInterval(stopwatchTimerRef);
   clearInterval(progressTimerRef);
 });
+
+const teleportStyle = ref({});
+const triggerRef    = ref(null);
+
+const updateDropdownPos = () => {
+  if (!triggerRef.value) return;
+  const r = triggerRef.value.getBoundingClientRect();
+  teleportStyle.value = {
+    position: 'fixed',
+    top:  r.bottom + 6 + 'px',
+    left: r.left + 'px',
+    width: r.width + 'px',
+    zIndex: 99999,
+  };
+};
+
+const openDropdown = () => {
+  updateDropdownPos();
+  dropdownOpen.value = true;
+};
 
 const elapsedMs  = ref(0);
 const stopwatchActive = ref(false);
@@ -262,9 +298,10 @@ const handleExecute = () => {
       </label>
       <div class="arch-dropdown" ref="dropdownRef">
         <button
+            ref="triggerRef"
             class="arch-trigger glass-input"
             :class="{ open: dropdownOpen, 'is-none': noneSelected }"
-            @click="dropdownOpen = !dropdownOpen"
+            @click="dropdownOpen ? dropdownOpen = false : openDropdown()"
             :disabled="isProcessing"
             type="button"
         >
@@ -276,31 +313,33 @@ const handleExecute = () => {
             <polyline points="6 9 12 15 18 9"/>
           </svg>
         </button>
-        <div v-if="dropdownOpen" class="arch-panel glass-panel">
-          <div class="arch-panel-header">
-            <input v-model="archSearch" class="arch-search glass-input" placeholder="Search..." autofocus/>
-            <div class="arch-bulk-actions">
-              <button class="link-btn" @click="selectAll" :disabled="allSelected">All</button>
-              <span class="bulk-divider">·</span>
-              <button class="link-btn" @click="clearAll" :disabled="noneSelected">None</button>
+        <Teleport to="body">
+          <div v-if="dropdownOpen" class="arch-panel glass-panel" :style="teleportStyle">
+            <div class="arch-panel-header">
+              <input v-model="archSearch" class="arch-search glass-input" placeholder="Search..." autofocus/>
+              <div class="arch-bulk-actions">
+                <button class="link-btn" @click="selectAll" :disabled="allSelected">All</button>
+                <span class="bulk-divider">·</span>
+                <button class="link-btn" @click="clearAll" :disabled="noneSelected">None</button>
+              </div>
             </div>
+            <ul class="arch-list">
+              <li
+                  v-for="arch in filteredArchs"
+                  :key="arch"
+                  class="arch-item"
+                  :class="{ selected: isSelected(arch) }"
+                  @click="toggleArch(arch)"
+              >
+                <span class="arch-check">
+                  <svg v-if="isSelected(arch)" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </span>
+                {{ arch }}
+              </li>
+              <li v-if="!filteredArchs.length" class="arch-empty">No matches for "{{ archSearch }}"</li>
+            </ul>
           </div>
-          <ul class="arch-list">
-            <li
-                v-for="arch in filteredArchs"
-                :key="arch"
-                class="arch-item"
-                :class="{ selected: isSelected(arch) }"
-                @click="toggleArch(arch)"
-            >
-              <span class="arch-check">
-                <svg v-if="isSelected(arch)" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-              </span>
-              {{ arch }}
-            </li>
-            <li v-if="!filteredArchs.length" class="arch-empty">No matches for "{{ archSearch }}"</li>
-          </ul>
-        </div>
+        </Teleport>
       </div>
     </div>
 
@@ -322,7 +361,7 @@ const handleExecute = () => {
     </div>
 
     <transition name="progress-fade">
-      <div v-if="progressVisible" class="progress-section">
+      <div v-if="progressVisible" class="progress-section" style="position: relative; z-index: 1;">
         <div class="progress-header">
           <span class="progress-label">
             <i class="pi" :class="progressDone ? 'pi-check-circle' : 'pi-spin pi-spinner'"></i>
