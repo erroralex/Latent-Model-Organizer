@@ -1,26 +1,16 @@
 <script setup>
 /**
- * SORTERVIEW.VUE
+ * SorterView.vue
  *
  * The primary interface for orchestrating the model organization workflow.
- * It manages the selection of source and target directories, architectural
- * filtering, and the execution of the sorting logic.
+ * It manages directory selection, architectural filtering, and execution logic.
  *
- * KEY FEATURES:
- * - Directory Management: Uses Electron-native dialogs for reliable folder
- *   selection. An "Open" button beside each path reveals the folder in the
- *   native file explorer (cross-platform via shell.openPath).
- * - Architecture Filtering: Features a searchable, multi-select dropdown to
- *   target specific model types.
- * - Execution Modes: Toggles between standard organization, deep recursive
- *   scanning, and non-destructive dry runs.
- * - Stopwatch: Measures wall-clock time from the moment the user fires the
- *   operation until the backend responds, then holds the final time on screen.
- * - Progress Bar: Fills asymptotically toward 85 % while the backend is busy
- *   (honest about not knowing real progress), then snaps to 100 % on
- *   completion and fades out after a short delay.
- * - Undo Integration: Provides a direct interface to restore the previous
- *   filesystem state.
+ * Key Capabilities:
+ * - Native Directory Management: Uses Electron-native dialogs and shell integration.
+ * - Architecture Filtering: Searchable multi-select system for targeting specific model types.
+ * - Progressive Execution: Toggles between standard, recursive, and simulation (dry run) modes.
+ * - Real-time Status: Integrated stopwatch and asymptotic/real progress tracking via API polling.
+ * - Undo Support: Direct interface to reverse the last organizational run.
  */
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
@@ -31,6 +21,7 @@ const props = defineProps({
   isDryRun:     { type: Boolean, default: false  },
   canUndo:      { type: Boolean, default: false  },
   apiBase:      { type: String,  default: ''     },
+  apiToken:     { type: String,  default: ''     },
 });
 
 const emit = defineEmits(['start-organize', 'update:isRecursive', 'update:isDryRun', 'undo']);
@@ -152,7 +143,9 @@ const SCAN_FILL_STEP     = 0.4;
 
 async function pollProgress() {
   try {
-    const res  = await fetch(`${props.apiBase}/api/progress`);
+    const res  = await fetch(`${props.apiBase}/api/progress`, {
+      headers: { 'Authorization': `Bearer ${props.apiToken}` }
+    });
     if (!res.ok) return;
     const data = await res.json();
 

@@ -6,15 +6,41 @@
     box-shadow: var(--shadow-panel);
 }
 
+/* --- Inputs (Aligned with Latent Library) --- */
 .glass-input, input[type="text"] {
-    width: 100%; padding: 12px; background: var(--bg-input) !important;
-    border: 1px solid var(--border-input) !important; color: var(--text-primary) !important;
-    border-radius: 6px; outline: none; transition: 0.3s ease;
+    width: 100%;
+    padding: 12px;
+    background: var(--bg-input) !important;
+    border: 1px solid var(--border-input) !important;
+    color: var(--text-primary) !important;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
+
 .glass-input:focus, input[type="text"]:focus {
+    box-shadow: none !important;
+    outline: none !important;
     border-color: transparent !important;
     border-image: var(--grad-hover) 1 !important;
-    box-shadow: 0 0 15px rgba(0,0,0,0.5) inset;
+}
+
+/* --- Custom Scrollbars --- */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--scrollbar-track, transparent);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.08));
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover, rgba(255, 255, 255, 0.15));
 }
 
 /* --- Header / Menubar --- */

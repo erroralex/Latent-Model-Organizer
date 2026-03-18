@@ -1,21 +1,18 @@
 <script setup>
 /**
- * APP.VUE
+ * App.vue
  *
  * The primary layout orchestration component for the Latent Model Organizer.
- * It manages global application state, including active views, configuration flags,
+ * It manages global application state, including navigation, configuration,
  * and system-wide notifications.
  *
- * KEY RESPONSIBILITIES:
- * - Navigation: Switches between Sorter and Fetcher views.
- * - API Orchestration: Centralizes HTTP communication with the backend.
- *   The API base URL is constructed dynamically by querying the Electron main
- *   process for the backend's ephemeral port on mount. In browser-only dev
- *   mode (no Electron) it falls back to an empty base so Vite's dev proxy
- *   handles the request.
- * - Persistence: Synchronizes user preferences (recursive, dry-run, directories) with LocalStorage.
- * - UI Shell: Controls the custom title bar, sidebar navigation, and integrated log console.
- * - State Management: Tracks processing status and operation reports for user feedback.
+ * Key Capabilities:
+ * - Dynamic View Switching: Manages navigation between Sorter and Fetcher modules.
+ * - API Orchestration: Centralizes HTTP communication and handles ephemeral port discovery
+ *   via Electron IPC for backend connectivity.
+ * - State Persistence: Synchronizes user preferences and directory paths with LocalStorage.
+ * - Integrated UI Shell: Controls the custom frame-less title bar, sidebar, and log console.
+ * - Progress Tracking: Coordinates with child components to provide real-time operation status.
  */
 import { ref, computed, onMounted, watch } from 'vue';
 import { useTheme } from './composables/useTheme';
@@ -61,6 +58,7 @@ const canUndo           = ref(false);
 const lastTargetDirectory = ref(lsGet('lmo:lastTargetDir', ''));
 
 const apiBase = ref('');
+const apiToken = ref('');
 
 const callApi = async (endpoint, body, msg) => {
   isProcessing.value = true;
@@ -68,7 +66,10 @@ const callApi = async (endpoint, body, msg) => {
   try {
     const res = await fetch(`${apiBase.value}${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiToken.value}`
+      },
       body: JSON.stringify(body),
     });
     const data = await res.json();
@@ -138,9 +139,10 @@ onMounted(async () => {
 
   if (window.electronAPI?.getBackendPort) {
     try {
-      const port = await window.electronAPI.getBackendPort();
-      if (port) {
-        apiBase.value = `http://localhost:${port}`;
+      const result = await window.electronAPI.getBackendPort();
+      if (result && result.port) {
+        apiBase.value = `http://127.0.0.1:${result.port}`;
+        apiToken.value = result.token || '';
         console.log(`[App] Backend API base resolved to: ${apiBase.value}`);
       }
     } catch (err) {
@@ -215,6 +217,7 @@ const closeReport = () => {
                   :isDryRun="isDryRun"
                   :canUndo="canUndo"
                   :apiBase="apiBase"
+                  :apiToken="apiToken"
                   @update:isRecursive="v => isRecursive = v"
                   @update:isDryRun="v => isDryRun = v"
                   @start-organize="handleStartOrganize"
@@ -248,7 +251,7 @@ const closeReport = () => {
         </div>
 
         <transition name="drawer">
-          <ConsoleWindow v-if="consoleOpen" :apiBase="apiBase" class="console-drawer"/>
+          <ConsoleWindow v-if="consoleOpen" :apiBase="apiBase" :apiToken="apiToken" class="console-drawer"/>
         </transition>
       </main>
     </div>

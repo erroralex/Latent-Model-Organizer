@@ -27,6 +27,11 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      # --- VERSIONING: Extract version from pom.xml ---
+      - name: Extract Maven project version
+        shell: bash
+        run: echo "APP_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f backend/pom.xml)" >> $GITHUB_ENV
+
       - name: Build Backend (Java HttpServer)
         working-directory: ./backend
         run: mvn clean package -DskipTests
@@ -49,6 +54,12 @@ jobs:
       - name: Install Electron Dependencies
         working-directory: ./electron
         run: npm ci
+
+      # --- VERSIONING: Inject Maven version into Electron ---
+      - name: Sync Electron Version with Maven
+        working-directory: ./electron
+        shell: bash
+        run: npm version ${{ env.APP_VERSION }} --no-git-tag-version
 
       # Prepare the runtime folder structure
       - name: Prepare Runtime Directory

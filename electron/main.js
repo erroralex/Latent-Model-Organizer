@@ -1,10 +1,16 @@
 /**
- * The primary process controller for the Electron application.
+ * main.js
  *
- * This module orchestrates the native desktop environment, providing essential
- * services not accessible to the web-based renderer process. It manages the
- * application lifecycle, native window orchestration, and cross-process
- * communication (IPC).
+ * The primary process controller for the Electron application.
+ * It orchestrates the native desktop environment, lifecycle management,
+ * and cross-process communication (IPC).
+ *
+ * Key Capabilities:
+ * - Backend Lifecycle: Spawns and manages the Java backend process with ephemeral port discovery.
+ * - Native Integration: Provides access to file dialogs and shell operations (openPath).
+ * - IPC Bridge: Handles requests from the renderer for backend port resolution and window controls.
+ * - Resource Management: Implements a clean shutdown sequence, terminating the backend
+ *   and cleaning up temporary port-hint files on exit.
  */
 
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
@@ -16,6 +22,7 @@ const fs = require('fs');
 const isDev = !app.isPackaged;
 let backendProcess = null;
 let backendPort = null;
+let backendToken = null;
 let isQuitting = false;
 const PORT_FILE_PATH = path.join(os.tmpdir(), '.lmo-port');
 
@@ -41,12 +48,13 @@ function startBackend() {
     return new Promise((resolve, reject) => {
         let resolved = false;
 
-        const finish = (port) => {
+        const finish = (port, token) => {
             if (resolved) return;
             resolved = true;
             backendPort = port;
-            console.log(`[main] Backend port resolved: ${port}`);
-            resolve(port);
+            backendToken = token;
+            console.log(`[main] Backend port resolved: ${port} with token ${token}`);
+            resolve({ port, token });
         };
 
         const fail = (reason) => {
@@ -54,7 +62,7 @@ function startBackend() {
             resolved = true;
             console.error(`[main] Port resolution failed: ${reason}. Falling back to 8080.`);
             backendPort = 8080;
-            resolve(8080);
+            resolve({ port: 8080, token: null });
         };
 
         const timeoutHandle = setTimeout(
@@ -66,11 +74,15 @@ function startBackend() {
             const pollHandle = setInterval(() => {
                 try {
                     const raw = fs.readFileSync(PORT_FILE_PATH, 'utf8').trim();
-                    const port = parseInt(raw, 10);
-                    if (!isNaN(port) && port > 0) {
-                        clearInterval(pollHandle);
-                        clearTimeout(timeoutHandle);
-                        finish(port);
+                    const parts = raw.split(':');
+                    if (parts.length >= 2) {
+                        const port = parseInt(parts[0], 10);
+                        const token = parts[1];
+                        if (!isNaN(port) && port > 0 && token) {
+                            clearInterval(pollHandle);
+                            clearTimeout(timeoutHandle);
+                            finish(port, token);
+                        }
                     }
                 } catch {
                 }
@@ -112,11 +124,12 @@ function startBackend() {
 
         backendProcess.stdout.on('data', (data) => {
             const text = data.toString();
-            const match = text.match(/LMO_PORT=(\d+)/);
+            const match = text.match(/LMO_PORT=(\d+):([a-f0-9\-]+)/);
             if (match) {
                 const port = parseInt(match[1], 10);
+                const token = match[2];
                 clearTimeout(timeoutHandle);
-                finish(port);
+                finish(port, token);
             }
         });
 
@@ -137,6 +150,7 @@ function createWindow() {
         width: 1400,
         height: 1200,
         title: 'Latent Model Organizer',
+        icon: path.join(__dirname, '../frontend/src/assets/lmo_icon.png'),
         frame: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
@@ -170,11 +184,12 @@ app.whenReady().then(async () => {
         return Promise.resolve('Invalid path');
     });
 
-    ipcMain.handle('app:getBackendPort', () => backendPort);
+    ipcMain.handle('app:getBackendPort', () => ({ port: backendPort, token: backendToken }));
 
     ipcMain.handle('api:undoLastOrganization', async () => {
-        const res = await fetch(`http://localhost:${backendPort}/api/undo`, {
+        const res = await fetch(`http://127.0.0.1:${backendPort}/api/undo`, {
             method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + backendToken }
         });
         if (!res.ok) throw new Error(`Undo failed with status ${res.status}`);
         return res.json();
@@ -214,16 +229,23 @@ app.on('before-quit', async (event) => {
 
     console.log('[main] App quitting - initiating cleanup...');
 
-    const shutdownUrl = `http://localhost:${backendPort}/api/shutdown`;
-
-    try {
-        await fetch(shutdownUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        console.log('[main] Backend shutdown signal sent.');
-    } catch (err) {
-        console.warn('[main] Could not send shutdown signal to backend:', err.message);
+    if (backendPort && backendToken) {
+        const shutdownUrl = `http://127.0.0.1:${backendPort}/api/shutdown`;
+        try {
+            await fetch(shutdownUrl, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + backendToken
+                },
+            });
+            console.log('[main] Backend shutdown signal sent.');
+        } catch (err) {
+            console.warn('[main] Could not send shutdown signal to backend:', err.message);
+            if (backendProcess) backendProcess.kill();
+        }
+    } else {
+        console.log('[main] No backend connected, skipping backend shutdown signal.');
         if (backendProcess) backendProcess.kill();
     }
 

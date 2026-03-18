@@ -1,60 +1,262 @@
 
+/* --- Navigation Buttons (Aligned with Latent Library) --- */
 .nav-btn {
     color: var(--text-secondary) !important;
-    border-radius: 8px; position: relative !important; z-index: 1 !important;
-    background: transparent !important; overflow: visible !important;
-    border: 1px solid transparent; margin: 4px !important;
-    padding: 8px 16px; font-weight: bold; cursor: pointer; transition: transform 0.2s;
-    display: inline-flex; align-items: center; gap: 8px;
-}
-.nav-btn::before {
-    content: ''; position: absolute; inset: -1px; background: var(--grad-hover);
-    border-radius: 9px; z-index: -2; opacity: 0; filter: blur(4px); transition: opacity 0.3s ease;
-}
-.nav-btn::after {
-    content: ''; position: absolute; inset: 0; background: transparent;
-    border-radius: 8px; z-index: -1; transition: background 0.3s ease;
-}
-.nav-btn:hover { color: var(--text-primary) !important; transform: translateY(-1px); }
-.nav-btn:hover::before { opacity: 0.8; }
-.nav-btn:hover::after { background: var(--bg-panel-opaque); }
-
-.nav-btn.active-nav-btn::before { opacity: 0.8; }
-.nav-btn.active-nav-btn::after { background: var(--bg-panel-opaque); }
-
-/* --- FIX: Removed background-clip text hack, replaced with native glow --- */
-.nav-btn.active-nav-btn {
-    color: var(--accent-primary) !important;
-    font-weight: 800;
-    text-shadow: 0 0 12px rgba(var(--accent-rgb, 102, 252, 241), 0.4); /* Glow effect */
+    border-radius: 8px;
+    position: relative !important;
+    z-index: 1 !important;
     background: transparent !important;
-    -webkit-text-fill-color: initial !important; /* Override any lingering clip issues */
+    overflow: visible !important;
+    border: 1px solid transparent;
+    margin: 4px !important;
+    padding: 8px 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.nav-btn.active-nav-btn i {
-    color: var(--accent-primary) !important;
-    filter: drop-shadow(0 0 4px rgba(var(--accent-rgb, 102, 252, 241), 0.5));
+.nav-btn::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: var(--grad-hover);
+    border-radius: 9px;
+    z-index: -2;
+    opacity: 0;
+    filter: blur(4px);
+    transition: opacity 0.3s ease;
 }
 
-.window-close-btn::before { background: var(--status-danger) !important; }
-.window-close-btn:hover { -webkit-text-fill-color: #fff !important; color: #fff !important; }
-.window-close-btn:hover::after { background: var(--status-danger) !important; }
+.nav-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    border-radius: 8px;
+    z-index: -1;
+    transition: background 0.3s ease;
+}
 
+.nav-btn:hover {
+    color: var(--text-primary) !important;
+    transform: translateY(-1px);
+}
+
+.nav-btn:hover::before {
+    opacity: 0.8;
+}
+
+.nav-btn:hover::after {
+    background: var(--bg-app, #000000);
+}
+
+/* --- Active Navigation State (Gradient Clip Hack Restored) --- */
+.nav-btn.active-nav-btn {
+    color: transparent !important;
+}
+
+.nav-btn.active-nav-btn::before {
+    opacity: 0.8;
+}
+
+.nav-btn.active-nav-btn::after {
+    background: var(--bg-app, #000000);
+}
+
+.nav-btn.active-nav-btn i,
+.nav-btn.active-nav-btn span {
+    background: var(--grad-text, var(--grad-hover));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent !important;
+    font-weight: 700;
+}
+
+/* --- Window Control Buttons --- */
+.window-close-btn {
+    position: relative !important;
+    z-index: 1 !important;
+    background: transparent !important;
+    overflow: visible !important;
+}
+
+.window-close-btn::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: var(--status-danger);
+    border-radius: 9px;
+    z-index: -2;
+    opacity: 0;
+    filter: blur(4px);
+    transition: opacity 0.3s ease;
+}
+
+.window-close-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    border-radius: 8px;
+    z-index: -1;
+    transition: background 0.3s ease;
+}
+
+.window-close-btn:hover {
+    color: var(--text-primary) !important;
+    transform: translateY(-1px);
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+.window-close-btn:hover::before {
+    opacity: 0.8;
+}
+
+.window-close-btn:hover::after {
+    background: var(--bg-app, #000000);
+}
+
+.window-close-btn:hover i {
+    color: var(--text-primary) !important;
+}
+
+/* --- Primary Action Buttons (Sorter & Fetcher) --- */
 .primary-btn {
-    background: var(--accent-primary); color: #000; border: none; padding: 12px 24px;
-    border-radius: 6px; font-weight: bold; cursor: pointer; transition: filter 0.2s;
-    width: 100%; display: flex; justify-content: center; align-items: center; gap: 8px;
+    position: relative !important;
+    z-index: 1 !important;
+    background: transparent !important;
+    color: var(--text-primary);
+    border: none;
+    padding: 14px 24px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    cursor: pointer;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    overflow: visible !important;
+    transition: transform 0.2s ease, color 0.2s ease;
 }
-.primary-btn:hover:not(:disabled) { filter: drop-shadow(0 0 8px var(--accent-primary)) brightness(1.2); }
-.primary-btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
 
-.secondary-btn, .link-btn {
-    background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-light);
-    padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s;
-    display: inline-flex; align-items: center; gap: 8px;
+.primary-btn::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: var(--grad-hover, linear-gradient(90deg, var(--accent-primary), var(--accent-secondary, #fff)));
+    border-radius: 9px;
+    z-index: -2;
+    opacity: 0.6;
+    filter: blur(4px);
+    transition: opacity 0.3s ease, filter 0.3s ease;
 }
+
+.primary-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--bg-app, #0a0a0a);
+    border-radius: 8px;
+    z-index: -1;
+    transition: background 0.3s ease;
+}
+
+.primary-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    color: var(--accent-primary);
+}
+
+.primary-btn:hover:not(:disabled)::before {
+    opacity: 1;
+    filter: blur(8px); /* Enhances the glow on hover */
+}
+
+.primary-btn:hover:not(:disabled)::after {
+    background: var(--bg-app, #000000);
+}
+
+.primary-btn i {
+    color: var(--accent-primary);
+    transition: filter 0.3s ease;
+}
+
+.primary-btn:hover:not(:disabled) i {
+    filter: drop-shadow(0 0 6px var(--accent-primary));
+}
+
+.primary-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.primary-btn:disabled::before {
+    filter: blur(2px);
+    opacity: 0.2;
+}
+
+/* --- Secondary & Link Buttons (Browse / Undo) --- */
+.secondary-btn, .link-btn {
+    position: relative !important;
+    z-index: 1 !important;
+    background: transparent !important;
+    color: var(--text-primary, #ffffff) !important;
+    border: 1px solid var(--border-light, #475569) !important;
+    padding: 10px 18px !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-family: inherit !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    overflow: hidden !important;
+    outline: none !important;
+    box-shadow: none !important; /* Kills PrimeVue's blue focus ring */
+    transition: border-color 0.2s, color 0.2s, box-shadow 0.2s !important;
+}
+
+.secondary-btn::before, .link-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    /* Uses your input background or a neutral dark glass fallback */
+    background: var(--bg-input, rgba(255, 255, 255, 0.05)) !important;
+    z-index: -1;
+    transition: background 0.2s;
+}
+
+/* Hover State */
 .secondary-btn:hover:not(:disabled), .link-btn:hover:not(:disabled) {
-    border-color: var(--accent-primary); box-shadow: 0 0 10px rgba(102,252,241,0.2);
+    border-color: var(--accent-primary) !important;
+    color: var(--accent-primary) !important;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.secondary-btn:hover:not(:disabled)::before, .link-btn:hover:not(:disabled)::before {
+    /* Slight brightening on hover */
+    background: var(--bg-hover, rgba(255, 255, 255, 0.09)) !important;
+}
+
+/* Disabled State */
+.secondary-btn:disabled, .link-btn:disabled {
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
+    color: var(--text-muted, #94a3b8) !important;
+    border-color: var(--border-input, #334155) !important;
+    box-shadow: none !important;
+}
+
+/* Ensure the icon inherits the exact same color and doesn't grab PrimeVue's */
+.secondary-btn i, .link-btn i {
+    color: inherit !important;
 }
 
 /* --- Sidebar Buttons --- */
