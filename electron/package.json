@@ -30,7 +30,11 @@
     "files": [
       "main.js",
       "preload.js",
-      "../frontend/dist/**/*"
+      {
+        "from": "../frontend/dist",
+        "to": "dist",
+        "filter": ["**/*"]
+      }
     ],
     "extraFiles": [
       {

@@ -88,7 +88,11 @@ public class LmoApplication {
             ModelAnalyzer modelAnalyzer = new ModelAnalyzer();
             OrganizationService organizationService = new OrganizationService(modelAnalyzer);
 
-            HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+            HttpServer server = HttpServer.create(
+                    new InetSocketAddress(InetAddress.getLoopbackAddress(), 0),
+                    0
+            );
+
             server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
             var securityFilter = new SecurityFilter(HANDSHAKE_TOKEN);
