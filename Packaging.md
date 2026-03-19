@@ -28,7 +28,6 @@ The build pipeline is triggered **only** when you push a tag starting with `v` (
 
 1.  **Update Version Numbers:**
     *   Update `<version>` in `backend/pom.xml`.
-    *   Update `"version"` in `electron/package.json`.
     *   Commit these changes: `git commit -am "Bump version to 1.0.0"` & `git push`.
 
 2.  **Tag and Push:**
