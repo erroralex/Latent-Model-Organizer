@@ -97,6 +97,7 @@ jobs:
           # Uncomment and add to repository secrets if distributing for macOS
           # APPLE_ID: ${{ secrets.APPLE_ID }}
           # APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npm run dist
 
       - name: Upload Artifacts

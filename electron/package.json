@@ -2,6 +2,10 @@
   "name": "latent-model-organizer-desktop",
   "version": "1.0.0",
   "description": "Desktop wrapper for Latent Model Organizer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/erroralex/latent-model-organizer.git"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -19,6 +23,13 @@
   "build": {
     "appId": "com.latent.organizer",
     "productName": "Latent Model Organizer",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "erroralex",
+        "repo": "latent-model-organizer"
+      }
+    ],
     "files": [
       "main.js",
       "preload.js",
