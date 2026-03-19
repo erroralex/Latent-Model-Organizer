@@ -61,7 +61,11 @@ jobs:
       - name: Sync Electron Version with Maven
         working-directory: ./electron
         shell: bash
-        run: npm version ${{ env.APP_VERSION }} --no-git-tag-version
+        run: |
+          cd electron
+          npm version ${{ env.APP_VERSION }} --no-git-tag-version --allow-same-version
+          cd ../frontend
+          npm version ${{ env.APP_VERSION }} --no-git-tag-version --allow-same-version
 
       # Prepare the runtime folder structure
       - name: Prepare Runtime Directory
