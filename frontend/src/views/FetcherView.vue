@@ -103,8 +103,8 @@ const handleExecute = () => {
     </div>
 
     <InfoModal v-if="showInfo" title="Metadata Fetcher Info" @close="showInfo = false">
-      <p>This tool performs a smart scan of your model library to find files missing Civitai metadata.</p>
-      <p>It calculates a highly optimized <strong>SHA256 hash</strong> of the model file, queries the Civitai API, and downloads the official metadata JSON and preview image.</p>
+      <p>This tool performs a smart scan of your model library to find files missing Civitai metadata.</p><br>
+      <p>It calculates a highly optimized <strong>SHA256 hash</strong> of the model file, queries the Civitai API, and downloads the official metadata JSON and preview image.</p><br>
       <p>Files are updated in-place. No models are moved during this process.</p>
     </InfoModal>
 

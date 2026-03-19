@@ -71,6 +71,10 @@ public class OrganizationService {
         this.civitaiApiClient = new CivitaiApiClient();
     }
 
+    public OperationReport organizeModels(Path sourceDir, Path targetDir, List<String> allowedArchitectures, boolean isRecursive, boolean isDryRun) {
+        return organizeModels(sourceDir, targetDir, allowedArchitectures, isRecursive, isDryRun, () -> false, total -> {}, () -> {});
+    }
+
     public OperationReport organizeModels(Path sourceDir, Path targetDir, List<String> allowedArchitectures,
                                           boolean isRecursive, boolean isDryRun, Supplier<Boolean> isCancelled,
                                           IntConsumer onTotalKnown, Runnable onGroupComplete) {
@@ -169,7 +173,7 @@ public class OrganizationService {
         List<Future<?>> futures = new ArrayList<>(manifest.moves().size());
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             for (MoveRecord record : manifest.moves()) {
-                futures.add(executor.submit(() -> reverseMove(record, restored, errors)));
+                futures.add(executor.submit(() -> reverseMove(record, targetDir, restored, errors)));
             }
         }
 
@@ -199,6 +203,10 @@ public class OrganizationService {
         return new OperationReport(
                 String.format("Undo complete. %d file(s) restored to their original locations.", restoredCount),
                 finalStats, new ArrayList<>(errors), restoredCount, 0);
+    }
+
+    public OperationReport fetchMissingMetadata(Path targetDir, boolean isRecursive, boolean isDryRun) {
+        return fetchMissingMetadata(targetDir, isRecursive, isDryRun, () -> false, total -> {}, () -> {});
     }
 
     public OperationReport fetchMissingMetadata(Path targetDir, boolean isRecursive, boolean isDryRun,
@@ -296,9 +304,9 @@ public class OrganizationService {
         }
     }
 
-    private void reverseMove(MoveRecord record, AtomicInteger restored, CopyOnWriteArrayList<String> errors) {
-        Path src = Path.of(record.to());
-        Path dst = Path.of(record.from());
+    private void reverseMove(MoveRecord record, Path targetDir, AtomicInteger restored, CopyOnWriteArrayList<String> errors) {
+        Path src = targetDir.toAbsolutePath().resolve(record.to()).normalize();
+        Path dst = targetDir.toAbsolutePath().resolve(record.from()).normalize();
 
         if (!Files.exists(src)) {
             String msg = String.format("Undo skipped — file no longer exists at '%s'", src);
@@ -468,8 +476,8 @@ public class OrganizationService {
                     if (!isDryRun) {
                         Files.move(file, targetPath, StandardCopyOption.REPLACE_EXISTING);
                         moveLog.offer(new MoveRecord(
-                                file.toAbsolutePath().toString(),
-                                targetPath.toAbsolutePath().toString()
+                                targetDir.toAbsolutePath().relativize(file.toAbsolutePath()).toString(),
+                                targetDir.toAbsolutePath().relativize(targetPath.toAbsolutePath()).toString()
                         ));
                     }
                 }

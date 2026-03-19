@@ -1,5 +1,6 @@
 package com.nilsson.lmo.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.nilsson.lmo.exception.OrganizerException;
 import com.nilsson.lmo.util.HashUtil;
 import org.slf4j.Logger;
@@ -15,8 +16,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import com.fasterxml.jackson.databind.JsonNode;
+import java.util.concurrent.Semaphore;
 
 /**
  * <p>The {@code CivitaiApiClient} is a high-performance HTTP client specifically engineered for interacting
@@ -35,6 +35,7 @@ import com.fasterxml.jackson.databind.JsonNode;
  *   <li><b>Resilience:</b> Implements retry logic with exponential backoff for 429 and 5xx status codes.</li>
  *   <li><b>Performance:</b> Utilizes HTTP/2 and multiplexed requests where supported.</li>
  *   <li><b>Diagnostics:</b> Includes timed hashing operations to provide visibility into large file processing.</li>
+ *   <li><b>Backpressure:</b> Employs a {@link Semaphore} to limit concurrent API requests, preventing rate-limit errors.</li>
  * </ul>
  * </p>
  */
@@ -50,6 +51,7 @@ public class CivitaiApiClient implements AutoCloseable {
     private static final int MAX_RETRIES = 3;
     private static final long BASE_BACKOFF_MS = 1_000L;
     private static final long HASH_WARN_THRESHOLD_MS = 3_000L;
+    private static final Semaphore API_THROTTLE = new Semaphore(5);
 
     private final ExecutorService executor;
     private final HttpClient httpClient;
@@ -86,8 +88,15 @@ public class CivitaiApiClient implements AutoCloseable {
         logger.debug("Querying Civitai API: {}", targetUrl);
 
         for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            HttpResponse<String> response = null;
             try {
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                API_THROTTLE.acquire();
+                try {
+                    response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                } finally {
+                    API_THROTTLE.release();
+                }
+
                 int status = response.statusCode();
 
                 switch (status) {
@@ -105,10 +114,8 @@ public class CivitaiApiClient implements AutoCloseable {
                                 status, attempt + 1, MAX_RETRIES, backoffMs);
                         sleep(backoffMs);
                     }
-                    default -> {
-                        throw new OrganizerException(
-                                "Civitai API returned unexpected status " + status + " for hash: " + sha256Hash);
-                    }
+                    default -> throw new OrganizerException(
+                            "Civitai API returned unexpected status " + status + " for hash: " + sha256Hash);
                 }
 
             } catch (IOException e) {
@@ -123,7 +130,7 @@ public class CivitaiApiClient implements AutoCloseable {
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new OrganizerException("Metadata fetch interrupted for hash: " + sha256Hash, e);
+                throw new OrganizerException("API request interrupted", e);
             }
         }
 
@@ -141,16 +148,20 @@ public class CivitaiApiClient implements AutoCloseable {
         logger.debug("Downloading preview image: {} → {}", imageUrl, destination.getFileName());
 
         try {
-            HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(destination));
-            int status = response.statusCode();
+            API_THROTTLE.acquire();
+            try {
+                HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(destination));
+                int status = response.statusCode();
 
-            if (status == 200) {
-                logger.info("Downloaded preview image: {}", destination.getFileName());
-            } else {
-                logger.warn("Preview image download failed (HTTP {}): {}", status, imageUrl);
-                deleteQuietly(destination);
+                if (status == 200) {
+                    logger.info("Downloaded preview image: {}", destination.getFileName());
+                } else {
+                    logger.warn("Preview image download failed (HTTP {}): {}", status, imageUrl);
+                    deleteQuietly(destination);
+                }
+            } finally {
+                API_THROTTLE.release();
             }
-
         } catch (IOException e) {
             logger.warn("IO error downloading preview image '{}': {}", imageUrl, e.getMessage());
             deleteQuietly(destination);
@@ -158,6 +169,7 @@ public class CivitaiApiClient implements AutoCloseable {
             Thread.currentThread().interrupt();
             logger.warn("Preview image download interrupted: {}", imageUrl);
             deleteQuietly(destination);
+            throw new OrganizerException("API request interrupted", e);
         }
     }
 
