@@ -20,11 +20,12 @@ import InfoModal from '../components/InfoModal.vue';
 
 const props = defineProps({
   isProcessing: { type: Boolean, default: false },
+  isCancelling: { type: Boolean, default: false },
   isRecursive: { type: Boolean, default: true },
   isDryRun: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['start-fetch', 'update:isRecursive', 'update:isDryRun', 'open-info']);
+const emit = defineEmits(['start-fetch', 'cancel-operation', 'update:isRecursive', 'update:isDryRun', 'open-info']);
 
 const lsGet = (k, fb) => { try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : fb; } catch { return fb; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -85,10 +86,21 @@ const handleExecute = () => {
       </label>
     </div>
 
-    <button class="primary-btn" @click="handleExecute" :disabled="isProcessing">
-      <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-cloud-download'"></i>
-      {{ isProcessing ? 'Fetching…' : 'Start Fetching Metadata' }}
-    </button>
+    <div class="button-group">
+      <button class="primary-btn" @click="handleExecute" :disabled="isProcessing">
+        <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-cloud-download'"></i>
+        {{ isProcessing ? 'Fetching…' : 'Start Fetching Metadata' }}
+      </button>
+      <button
+          v-if="isProcessing"
+          class="secondary-btn cancel-btn"
+          @click="emit('cancel-operation')"
+          :disabled="isCancelling"
+      >
+        <i class="pi" :class="isCancelling ? 'pi-spin pi-spinner' : 'pi-times-circle'"></i>
+        {{ isCancelling ? 'Cancelling...' : 'Cancel' }}
+      </button>
+    </div>
 
     <InfoModal v-if="showInfo" title="Metadata Fetcher Info" @close="showInfo = false">
       <p>This tool performs a smart scan of your model library to find files missing Civitai metadata.</p>
@@ -98,3 +110,22 @@ const handleExecute = () => {
 
   </div>
 </template>
+<style scoped>
+.button-group {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+.button-group .primary-btn {
+  flex-grow: 1;
+}
+.cancel-btn {
+  border-color: var(--status-error-faded);
+  color: var(--status-error);
+}
+.cancel-btn:hover:not(:disabled) {
+  background: var(--status-error-faded);
+  border-color: var(--status-error);
+  color: #fff;
+}
+</style>

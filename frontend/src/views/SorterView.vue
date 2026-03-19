@@ -17,6 +17,7 @@ import InfoModal from '../components/InfoModal.vue';
 
 const props = defineProps({
   isProcessing: { type: Boolean, default: false },
+  isCancelling: { type: Boolean, default: false },
   isRecursive:  { type: Boolean, default: true  },
   isDryRun:     { type: Boolean, default: false  },
   canUndo:      { type: Boolean, default: false  },
@@ -24,7 +25,7 @@ const props = defineProps({
   apiToken:     { type: String,  default: ''     },
 });
 
-const emit = defineEmits(['start-organize', 'update:isRecursive', 'update:isDryRun', 'undo']);
+const emit = defineEmits(['start-organize', 'cancel-operation', 'update:isRecursive', 'update:isDryRun', 'undo']);
 
 const lsGet = (k, fb) => {
   try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : fb; } catch { return fb; }
@@ -382,10 +383,21 @@ const handleExecute = () => {
       </div>
     </transition>
 
-    <button class="primary-btn" @click="handleExecute" :disabled="isProcessing">
-      <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-sort-alt'"></i>
-      {{ isProcessing ? 'Organizing...' : 'Start Organization' }}
-    </button>
+    <div class="button-group">
+      <button class="primary-btn" @click="handleExecute" :disabled="isProcessing">
+        <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-sort-alt'"></i>
+        {{ isProcessing ? 'Organizing...' : 'Start Organization' }}
+      </button>
+      <button
+          v-if="isProcessing"
+          class="secondary-btn cancel-btn"
+          @click="emit('cancel-operation')"
+          :disabled="isCancelling"
+      >
+        <i class="pi" :class="isCancelling ? 'pi-spin pi-spinner' : 'pi-times-circle'"></i>
+        {{ isCancelling ? 'Cancelling...' : 'Cancel' }}
+      </button>
+    </div>
 
     <button
         class="secondary-btn"
@@ -535,5 +547,23 @@ const handleExecute = () => {
 .progress-fade-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+.button-group {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+.button-group .primary-btn {
+  flex-grow: 1;
+}
+.cancel-btn {
+  border-color: var(--status-error-faded);
+  color: var(--status-error);
+}
+.cancel-btn:hover:not(:disabled) {
+  background: var(--status-error-faded);
+  border-color: var(--status-error);
+  color: #fff;
 }
 </style>

@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -70,14 +71,8 @@ public class OrganizationService {
         this.civitaiApiClient = new CivitaiApiClient();
     }
 
-    public OperationReport organizeModels(Path sourceDir, Path targetDir, List<String> allowedArchitectures, boolean isRecursive, boolean isDryRun) {
-        return organizeModels(sourceDir, targetDir, allowedArchitectures, isRecursive, isDryRun, total -> {
-        }, () -> {
-        });
-    }
-
     public OperationReport organizeModels(Path sourceDir, Path targetDir, List<String> allowedArchitectures,
-                                          boolean isRecursive, boolean isDryRun,
+                                          boolean isRecursive, boolean isDryRun, Supplier<Boolean> isCancelled,
                                           IntConsumer onTotalKnown, Runnable onGroupComplete) {
         logger.info("Starting organization task. Recursive: {}, Dry Run: {}", isRecursive, isDryRun);
         Set<String> allowedSet = buildAllowedSet(allowedArchitectures);
@@ -89,9 +84,14 @@ public class OrganizationService {
 
         try (Stream<Path> fileStream = isRecursive ? Files.walk(sourceDir, MAX_SCAN_DEPTH) : Files.list(sourceDir)) {
             List<Path> allFiles = fileStream
+                    .filter(p -> !isCancelled.get()) // Short-circuit scan
                     .filter(Files::isRegularFile)
                     .filter(p -> !isAlreadyOrganized(p, targetDir))
                     .toList();
+
+            if (isCancelled.get()) {
+                return createCancelledReport(stats, errors);
+            }
 
             int totalFiles = allFiles.size();
             logger.info("Found {} candidate files.", totalFiles);
@@ -104,7 +104,9 @@ public class OrganizationService {
             List<Future<?>> futures = new ArrayList<>();
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 for (Map.Entry<String, List<Path>> entry : groupedFiles.entrySet()) {
+                    if (isCancelled.get()) break;
                     futures.add(executor.submit(() -> {
+                        if (isCancelled.get()) return;
                         processGroup(entry.getKey(), entry.getValue(), targetDir, allowedSet, isDryRun, stats, errors, moveLog, createdDirs);
                         onGroupComplete.run();
                     }));
@@ -120,6 +122,10 @@ public class OrganizationService {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
+            }
+
+            if (isCancelled.get()) {
+                return createCancelledReport(stats, errors);
             }
 
             if (!isDryRun && !moveLog.isEmpty()) {
@@ -195,14 +201,8 @@ public class OrganizationService {
                 finalStats, new ArrayList<>(errors), restoredCount, 0);
     }
 
-    public OperationReport fetchMissingMetadata(Path targetDir, boolean isRecursive, boolean isDryRun) {
-        return fetchMissingMetadata(targetDir, isRecursive, isDryRun, total -> {
-        }, () -> {
-        });
-    }
-
     public OperationReport fetchMissingMetadata(Path targetDir, boolean isRecursive, boolean isDryRun,
-                                                IntConsumer onTotalKnown, Runnable onItemComplete) {
+                                                Supplier<Boolean> isCancelled, IntConsumer onTotalKnown, Runnable onItemComplete) {
         logger.info("Starting metadata fetch scan. Recursive: {}, Dry Run: {}", isRecursive, isDryRun);
 
         ConcurrentHashMap<String, AtomicInteger> stats = new ConcurrentHashMap<>();
@@ -210,10 +210,15 @@ public class OrganizationService {
 
         try (Stream<Path> fileStream = isRecursive ? Files.walk(targetDir, MAX_SCAN_DEPTH) : Files.list(targetDir)) {
             List<Path> modelsToProcess = fileStream
+                    .filter(p -> !isCancelled.get()) // Short-circuit scan
                     .filter(Files::isRegularFile)
                     .filter(p -> p.toString().toLowerCase().endsWith(".safetensors"))
                     .filter(this::isMissingSidecar)
                     .toList();
+
+            if (isCancelled.get()) {
+                return createCancelledReport(stats, errors);
+            }
 
             int totalProcessed = modelsToProcess.size();
             logger.info("Found {} models missing metadata sidecars.", totalProcessed);
@@ -223,7 +228,9 @@ public class OrganizationService {
             List<Future<?>> fetchFutures = new ArrayList<>();
             try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 for (Path modelPath : modelsToProcess) {
+                    if (isCancelled.get()) break;
                     fetchFutures.add(executor.submit(() -> {
+                        if (isCancelled.get()) return;
                         processMissingMetadata(modelPath, isDryRun, stats, errors);
                         onItemComplete.run();
                     }));
@@ -240,6 +247,10 @@ public class OrganizationService {
                 }
             }
 
+            if (isCancelled.get()) {
+                return createCancelledReport(stats, errors);
+            }
+
             logger.info("Metadata fetch task completed.");
 
             Map<String, Integer> finalStats = stats.entrySet().stream()
@@ -252,6 +263,16 @@ public class OrganizationService {
         } catch (IOException e) {
             throw new OrganizerException("Failed to scan target directory: " + targetDir, e);
         }
+    }
+
+    private OperationReport createCancelledReport(ConcurrentHashMap<String, AtomicInteger> stats, CopyOnWriteArrayList<String> errors) {
+        logger.warn("Operation was cancelled by the user.");
+        errors.add("Operation was manually cancelled by the user. Partial changes may have been applied.");
+        Map<String, Integer> finalStats = stats.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().get()));
+        int totalProcessed = finalStats.values().stream().mapToInt(Integer::intValue).sum();
+        int totalUncategorized = finalStats.getOrDefault(UNCATEGORIZED, 0);
+        return new OperationReport("Operation Cancelled", finalStats, new ArrayList<>(errors), totalProcessed, totalUncategorized);
     }
 
     private void writeUndoManifest(Path targetDir, ConcurrentLinkedQueue<MoveRecord> moveLog) {
@@ -442,7 +463,7 @@ public class OrganizationService {
 
                 String newFileName = targetBaseName + extension;
                 Path targetPath = architectureDir.resolve(newFileName);
-                
+
                 if (!file.toAbsolutePath().equals(targetPath.toAbsolutePath())) {
                     if (!isDryRun) {
                         Files.move(file, targetPath, StandardCopyOption.REPLACE_EXISTING);
@@ -460,7 +481,6 @@ public class OrganizationService {
         } catch (IOException e) {
             String msg = String.format("IO error processing group '%s': %s", originalBaseName, e.getMessage());
             logger.error(msg, e);
-            errors.add(msg);
         } catch (Exception e) {
             String msg = String.format("Unexpected error processing group '%s': %s", originalBaseName, e.getMessage());
             logger.error(msg, e);
