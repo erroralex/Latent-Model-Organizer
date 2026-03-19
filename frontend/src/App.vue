@@ -52,6 +52,7 @@ watch(isDryRun,    v => lsSet('lmo:isDryRun',     v));
 
 const statusMessage     = ref('Ready.');
 const isProcessing      = ref(false);
+const isCancelling      = ref(false);
 const showReportModal   = ref(false);
 const operationReport   = ref(null);
 const canUndo           = ref(false);
@@ -59,6 +60,12 @@ const lastTargetDirectory = ref(lsGet('lmo:lastTargetDir', ''));
 
 const apiBase = ref('');
 const apiToken = ref('');
+
+watch(isProcessing, (newValue) => {
+  if (!newValue) {
+    isCancelling.value = false;
+  }
+});
 
 const callApi = async (endpoint, body, msg) => {
   isProcessing.value = true;
@@ -82,6 +89,23 @@ const callApi = async (endpoint, body, msg) => {
     statusMessage.value = '❌ ' + err.message;
   } finally {
     isProcessing.value = false;
+  }
+};
+
+const cancelOperation = async () => {
+  isCancelling.value = true;
+  statusMessage.value = '⏳ Sending cancellation signal...';
+  try {
+    const res = await fetch(`${apiBase.value}/api/cancel`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiToken.value}` },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to send cancel signal.');
+    statusMessage.value = '⚠️ Cancellation requested. Waiting for task to terminate.';
+  } catch (err) {
+    statusMessage.value = `❌ ${err.message}`;
+    isCancelling.value = false; // Reset if the cancel call itself fails
   }
 };
 
@@ -213,6 +237,7 @@ const closeReport = () => {
               <SorterView
                   v-if="activeTab === 'sort'"
                   :isProcessing="isProcessing"
+                  :isCancelling="isCancelling"
                   :isRecursive="isRecursive"
                   :isDryRun="isDryRun"
                   :canUndo="canUndo"
@@ -221,17 +246,20 @@ const closeReport = () => {
                   @update:isRecursive="v => isRecursive = v"
                   @update:isDryRun="v => isDryRun = v"
                   @start-organize="handleStartOrganize"
+                  @cancel-operation="cancelOperation"
                   @undo="handleUndo"
               />
 
               <FetcherView
                   v-else
                   :isProcessing="isProcessing"
+                  :isCancelling="isCancelling"
                   :isRecursive="isRecursive"
                   :isDryRun="isDryRun"
                   @update:isRecursive="v => isRecursive = v"
                   @update:isDryRun="v => isDryRun = v"
                   @start-fetch="handleStartFetch"
+                  @cancel-operation="cancelOperation"
               />
             </div>
 

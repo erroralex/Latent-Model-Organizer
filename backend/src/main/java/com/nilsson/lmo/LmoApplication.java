@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -63,6 +64,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>{@code GET  /api/progress} - Real-time polling endpoint for operation status.</li>
  *   <li>{@code GET  /api/architectures} - Returns the list of supported architectures.</li>
  *   <li>{@code POST /api/shutdown} - Initiates a graceful termination sequence.</li>
+ *   <li>{@code POST /api/cancel} - Sends a cancellation signal to the active long-running operation.</li>
  * </ul>
  * </p>
  *
@@ -78,6 +80,8 @@ public class LmoApplication {
     static final AtomicInteger progressProcessed = new AtomicInteger(0);
     static volatile boolean progressActive = false;
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    static final AtomicBoolean cancelRequested = new AtomicBoolean(false);
+
 
     public static void main(String[] args) {
         try {
@@ -92,6 +96,7 @@ public class LmoApplication {
             createSecureContext(server, "/api/organize", new OrganizeHandler(organizationService), securityFilter);
             createSecureContext(server, "/api/undo", new UndoHandler(organizationService), securityFilter);
             createSecureContext(server, "/api/fetch", new FetchHandler(organizationService), securityFilter);
+            createSecureContext(server, "/api/cancel", new CancelHandler(), securityFilter);
             createSecureContext(server, "/api/logs", new LogStreamHandler(), securityFilter);
             createSecureContext(server, "/api/progress", new ProgressHandler(), securityFilter);
             createSecureContext(server, "/api/architectures", new ArchitectureHandler(modelAnalyzer), securityFilter);
@@ -168,6 +173,7 @@ public class LmoApplication {
                     return;
                 }
 
+                cancelRequested.set(false);
                 progressProcessed.set(0);
                 progressTotal.set(0);
                 progressActive = true;
@@ -182,6 +188,7 @@ public class LmoApplication {
                                     : Collections.emptyList(),
                             request.isRecursive(),
                             request.isDryRun(),
+                            cancelRequested::get,
                             progressTotal::set,
                             progressProcessed::incrementAndGet
                     );
@@ -269,6 +276,7 @@ public class LmoApplication {
                     return;
                 }
 
+                cancelRequested.set(false);
                 progressProcessed.set(0);
                 progressTotal.set(0);
                 progressActive = true;
@@ -279,6 +287,7 @@ public class LmoApplication {
                             Paths.get(request.targetDirectory()),
                             request.isRecursive(),
                             request.isDryRun(),
+                            cancelRequested::get,
                             progressTotal::set,
                             progressProcessed::incrementAndGet
                     );
@@ -293,6 +302,25 @@ public class LmoApplication {
                 logger.error("Internal server error during fetch", e);
                 sendError(exchange, 500, "Internal Server Error: " + e.getMessage());
             }
+        }
+    }
+
+    static class CancelHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            addCorsHeaders(exchange);
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendError(exchange, 405, "Method Not Allowed");
+                return;
+            }
+
+            logger.info("Received cancellation signal.");
+            cancelRequested.set(true);
+            sendJson(exchange, 200, Map.of("status", "cancelling", "message", "Cancellation signal sent."));
         }
     }
 
