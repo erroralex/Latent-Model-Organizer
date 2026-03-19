@@ -292,7 +292,7 @@ const handleExecute = () => {
 
     <div class="form-group">
       <label class="form-label">
-        Architectures
+        Architectures <span class="label-hint">to sort</span>
         <span class="label-hint" v-if="!allSelected && !noneSelected">
           {{ selectedArchitectures.length }}/{{ ALL_ARCHS.length }}
         </span>
@@ -410,10 +410,11 @@ const handleExecute = () => {
     </button>
 
     <InfoModal v-if="showInfo" title="Model Organizer Info" @close="showInfo = false">
-      <p>This tool scans massive <code>.safetensors</code> libraries using zero-memory byte parsing.</p>
-      <p>It automatically identifies model architectures by reading header metadata without loading the full file.</p>
+      <p>This tool scans massive <code>.safetensors</code> libraries using zero-memory byte parsing.</p><br>
+      <p>It automatically identifies model architectures by reading header metadata without loading the full file.</p><br>
       <p>Orphaned sidecar files (like preview images <code>.png</code>, <code>.json</code> metadata, and text files) are
-        grouped with their parent model and moved together as an atomic unit to keep your library clean.</p>
+        grouped with their parent model and moved together as an atomic unit to keep your library clean.</p><br>
+      <p>Sorts models into corresponding architectural sub-folders</p>
     </InfoModal>
 
   </div>
