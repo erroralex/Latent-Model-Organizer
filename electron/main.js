@@ -162,7 +162,7 @@ function createWindow() {
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173');
     } else {
-        const indexPath = path.join(__dirname, '../frontend/dist/index.html');
+        const indexPath = path.join(__dirname, 'dist', 'index.html');
         mainWindow.loadFile(indexPath).catch((e) => {
             console.error('[main] Failed to load index.html:', e);
         });
