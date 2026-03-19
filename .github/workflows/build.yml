@@ -108,6 +108,3 @@ jobs:
             electron/dist/*.exe
             electron/dist/*.AppImage
             electron/dist/*.dmg
-            electron/dist/*.zip
-            electron/dist/*.deb
-            electron/dist/*.rpm

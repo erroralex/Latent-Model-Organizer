@@ -11,7 +11,6 @@
     "start": "electron .",
     "dist": "electron-builder"
   },
-  "keywords": [],
   "author": "Latent Model Organizer",
   "license": "ISC",
   "type": "commonjs",
@@ -23,13 +22,11 @@
   "build": {
     "appId": "com.latent.organizer",
     "productName": "Latent Model Organizer",
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "erroralex",
-        "repo": "latent-model-organizer"
-      }
-    ],
+    "publish": {
+      "provider": "github",
+      "owner": "erroralex",
+      "repo": "latent-model-organizer"
+    },
     "files": [
       "main.js",
       "preload.js",
@@ -43,19 +40,22 @@
       }
     ],
     "directories": {
-      "output": "dist",
-      "buildResources": "build"
+      "output": "dist"
     },
     "win": {
-      "target": "nsis"
+      "target": "portable",
+      "icon": "../frontend/src/assets/lmo_icon.png"
     },
     "linux": {
-      "target": ["AppImage", "deb", "rpm"],
-      "category": "Utility"
+      "target": "AppImage",
+      "category": "Utility",
+      "icon": "../frontend/src/assets/lmo_icon.png"
     },
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.utilities",
+      "icon": "../frontend/src/assets/lmo_icon.png",
+      "identity": null
     }
   }
 }
