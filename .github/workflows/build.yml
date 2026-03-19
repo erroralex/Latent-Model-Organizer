@@ -70,14 +70,6 @@ jobs:
         shell: bash
         run: npm version ${{ env.APP_VERSION }} --no-git-tag-version --allow-same-version
 
-      # Prepare the runtime folder structure
-      - name: Prepare Runtime Directory
-        shell: bash
-        run: |
-          mkdir -p electron/runtime/app
-          # Copy the exact jar name specified in pom.xml finalName
-          cp backend/target/backend.jar electron/runtime/app/backend.jar
-
       # Bundle a custom JRE using jlink directly into the runtime folder
       - name: Create Custom JRE
         shell: bash
@@ -89,6 +81,14 @@ jobs:
             --no-man-pages \
             --no-header-files \
             --compress=2
+
+      # Prepare the runtime folder structure
+      - name: Prepare Runtime Directory
+        shell: bash
+        run: |
+          mkdir -p electron/runtime/app
+          # Copy the exact jar name specified in pom.xml finalName
+          cp backend/target/backend.jar electron/runtime/app/backend.jar      
 
       - name: Build Electron App
         working-directory: ./electron
