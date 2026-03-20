@@ -14,15 +14,21 @@
  * @see useTheme.js
  * @see App.vue
  */
+import { ref, onMounted } from 'vue';
+
 const props = defineProps({
   currentTheme: {type: String, required: true},
   availableThemes: {type: Array, required: true},
   isRecursive: {type: Boolean, required: true},
   isDryRun: {type: Boolean, required: true},
+  apiBase: { type: String, required: true },
+  apiToken: { type: String, required: true },
 });
 const emit = defineEmits(['applyTheme', 'update:isRecursive', 'update:isDryRun', 'close']);
 
-const openKofi = () => window.electronAPI?.openExternal('https://ko-fi.com');
+const appVersion = ref('dev');
+
+const openKofi = () => window.electronAPI?.openExternal('https://ko-fi.com/error_alex');
 
 const THEME_META = {
   neon: {label: 'Deep Neon', icon: 'pi-bolt', accent: '#66fcf1'},
@@ -31,6 +37,23 @@ const THEME_META = {
   fanfriction: {label: 'Fan Friction', icon: 'pi-heart', accent: '#d2b48c'},
   'fanfriction-light': {label: 'Fan Friction Light', icon: 'pi-heart-fill', accent: '#a0522d'},
 };
+
+onMounted(async () => {
+  try {
+    const res = await fetch(`${props.apiBase}/api/version`, {
+      headers: {
+        ...(props.apiToken ? { 'Authorization': `Bearer ${props.apiToken}` } : {})
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      appVersion.value = data.version || 'dev';
+    }
+  } catch (e) {
+    console.warn("Could not fetch app version", e);
+  }
+});
+
 </script>
 
 <template>
@@ -113,7 +136,7 @@ const THEME_META = {
         </section>
 
         <section class="settings-section about-section">
-          <span class="about-text">Latent Model Organizer · Java 21 + Vue 3 + Electron</span>
+          <span class="about-text">Version {{ appVersion }}</span>
         </section>
 
       </div>
