@@ -31,6 +31,7 @@ Engineered from the ground up for power users managing terabytes of models, prio
 
 * **Standalone Desktop App:** Runs as a single `.exe` (Windows), `.AppImage` (Linux), or `.dmg` (macOS). No installer required.
 * **Bundled Runtime:** Includes a self-contained Java 21 environment. No system-wide Java installation is required.
+* **Secure Local Execution:** The UI communicates with the Java engine over a secure, token-authenticated IPv4 loopback (`127.0.0.1`). It never binds to external network interfaces, completely bypassing annoying OS firewall prompts and guaranteeing your local file operations cannot be intercepted.
 * **Dry Run Mode:** Test your organization parameters safely. The app will calculate hashes, read headers, and output exactly what *would* happen to the console without moving a single file.
 * **Deep Scanning:** Toggle recursive scanning to organize models buried deep within nested subfolders.
 * **Non-Destructive Grouping:** Associated files (e.g., `model_v1.safetensors`, `model_v1.preview.png`, `model_v1.civitai.info`) are safely bundled and moved as atomic units.
@@ -92,7 +93,7 @@ Latent Model Organizer bypasses heavy frameworks to deliver raw native performan
 [![Download Latest Release](https://img.shields.io/badge/Download-Latest_Release-2ea44f?style=for-the-badge&logo=github&logoColor=white)](https://github.com/erroralex/latent-model-organizer/releases/latest)
 
 1.  **Download** the appropriate file for your OS:
-    * **Windows:** `Latent Model Organizer Setup X.X.X.exe`
+    * **Windows:** `Latent Model Organizer X.X.X.exe`
     * **Linux:** `Latent Model Organizer-X.X.X.AppImage` (mark as executable with `chmod +x`)
     * **macOS:** `Latent Model Organizer-X.X.X.dmg`
 2.  **Run** the application. No installation is required.
