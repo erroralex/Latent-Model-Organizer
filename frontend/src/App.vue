@@ -57,6 +57,7 @@ const showReportModal   = ref(false);
 const operationReport   = ref(null);
 const canUndo           = ref(false);
 const lastTargetDirectory = ref(lsGet('lmo:lastTargetDir', ''));
+const isBackendReady    = ref(false);
 
 const apiBase = ref('http://localhost:8080'); // Dev fallback
 const apiToken = ref('');
@@ -107,7 +108,7 @@ const cancelOperation = async () => {
     statusMessage.value = '⚠️ Cancellation requested. Waiting for task to terminate.';
   } catch (err) {
     statusMessage.value = `❌ ${err.message}`;
-    isCancelling.value = false; // Reset if the cancel call itself fails
+    isCancelling.value = false;
   }
 };
 
@@ -160,25 +161,32 @@ const minimizeWindow = () => window.windowAPI?.minimize();
 const maximizeWindow = () => window.windowAPI?.maximize();
 const closeWindow    = () => window.windowAPI?.close();
 
-async function initializeBackend() {
-  if (window.electronAPI && window.electronAPI.getBackendPort) {
-    try {
+const initializeBackendConnection = async () => {
+  try {
+    if (window.electronAPI && window.electronAPI.getBackendPort) {
       const backend = await window.electronAPI.getBackendPort();
       if (backend && backend.port) {
         apiBase.value = `http://127.0.0.1:${backend.port}`;
         apiToken.value = backend.token;
-        console.log(`[LMO] Bound to backend at ${apiBase.value}`);
+
+        if (backend.port === 8080 && backend.token === null) {
+          statusMessage.value = "❌ FATAL: Java engine failed to start.";
+        } else {
+          console.log(`[LMO] Bound to backend at ${apiBase.value}`);
+        }
       }
-    } catch (e) {
-      console.error('[LMO] Failed to retrieve backend port via IPC:', e);
-      statusMessage.value = '❌ Failed to connect to backend.';
     }
+  } catch (e) {
+    console.error('[LMO] Failed to retrieve backend port via IPC:', e);
+    statusMessage.value = '❌ Failed to connect to backend.';
+  } finally {
+    isBackendReady.value = true;
   }
-}
+};
 
 onMounted(async () => {
   applyTheme(currentTheme.value);
-  await initializeBackend();
+  await initializeBackendConnection();
 });
 
 const statusClass = computed(() => {
@@ -240,33 +248,38 @@ const closeReport = () => {
         <div class="content-scroll">
           <div class="content-container">
             <div class="glass-panel main-card">
-              <SorterView
-                  v-if="activeTab === 'sort'"
-                  :isProcessing="isProcessing"
-                  :isCancelling="isCancelling"
-                  :isRecursive="isRecursive"
-                  :isDryRun="isDryRun"
-                  :canUndo="canUndo"
-                  :apiBase="apiBase"
-                  :apiToken="apiToken"
-                  @update:isRecursive="v => isRecursive = v"
-                  @update:isDryRun="v => isDryRun = v"
-                  @start-organize="handleStartOrganize"
-                  @cancel-operation="cancelOperation"
-                  @undo="handleUndo"
-              />
+              <div v-if="isBackendReady">
+                <SorterView
+                    v-if="activeTab === 'sort'"
+                    :isProcessing="isProcessing"
+                    :isCancelling="isCancelling"
+                    :isRecursive="isRecursive"
+                    :isDryRun="isDryRun"
+                    :canUndo="canUndo"
+                    :apiBase="apiBase"
+                    :apiToken="apiToken"
+                    @update:isRecursive="v => isRecursive = v"
+                    @update:isDryRun="v => isDryRun = v"
+                    @start-organize="handleStartOrganize"
+                    @cancel-operation="cancelOperation"
+                    @undo="handleUndo"
+                />
 
-              <FetcherView
-                  v-else
-                  :isProcessing="isProcessing"
-                  :isCancelling="isCancelling"
-                  :isRecursive="isRecursive"
-                  :isDryRun="isDryRun"
-                  @update:isRecursive="v => isRecursive = v"
-                  @update:isDryRun="v => isDryRun = v"
-                  @start-fetch="handleStartFetch"
-                  @cancel-operation="cancelOperation"
-              />
+                <FetcherView
+                    v-else
+                    :isProcessing="isProcessing"
+                    :isCancelling="isCancelling"
+                    :isRecursive="isRecursive"
+                    :isDryRun="isDryRun"
+                    @update:isRecursive="v => isRecursive = v"
+                    @update:isDryRun="v => isDryRun = v"
+                    @start-fetch="handleStartFetch"
+                    @cancel-operation="cancelOperation"
+                />
+              </div>
+              <div v-else class="content-area glass-panel" style="display: flex; align-items: center; justify-content: center; height: 100%; min-height: 400px;">
+                <h2><i class="pi pi-spin pi-spinner" style="margin-right: 10px;"></i> Connecting to Engine...</h2>
+              </div>
             </div>
 
             <div class="status-bar glass-panel" :class="statusClass">
@@ -274,7 +287,7 @@ const closeReport = () => {
                  :class="{
                   'pi-check-circle':         statusMessage.startsWith('✅'),
                   'pi-exclamation-triangle': statusMessage.startsWith('⚠️'),
-  'pi-times-circle':         statusMessage.startsWith('❌'),
+                  'pi-times-circle':         statusMessage.startsWith('❌'),
                   'pi-info-circle':          statusMessage === 'Ready.',
                   'pi-spin pi-spinner':      isProcessing,
                 }"
