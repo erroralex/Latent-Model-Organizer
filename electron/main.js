@@ -119,7 +119,7 @@ function startBackend() {
 
         console.log('[main] Spawning Java backend...');
         backendProcess = spawn(paths.javaPath, [
-            '-Djava.net.preferIPv4Stack=true', // <-- ADD THIS FLAG
+            '-Djava.net.preferIPv4Stack=true',
             '-jar',
             paths.jarPath
         ], {
