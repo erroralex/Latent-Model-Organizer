@@ -81,6 +81,4 @@ Once all jobs are green:
 3.  Download the files under **Assets**:
     *   `.exe` (Windows Installer)
     *   `.AppImage` (Linux Portable)
-    *   `.deb` / `.rpm` (Linux Installers)
     *   `.dmg` (macOS Installer)
-    *   `.zip` (Generic Archive)
