@@ -32,7 +32,7 @@ function getBackendPaths() {
         return null;
     }
 
-    const rootDir = path.join(process.resourcesPath, '..', 'runtime');
+    const rootDir = path.join(process.resourcesPath, 'runtime');
     const binName = process.platform === 'win32' ? 'java.exe' : 'java';
     const javaDir = process.platform === 'darwin' ? path.join('Contents', 'Home', 'bin') : 'bin';
 

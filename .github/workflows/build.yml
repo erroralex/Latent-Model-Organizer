@@ -8,11 +8,16 @@ on:
 permissions:
   contents: write
 
+# Forces Node 24 for all actions to fix the upcoming deprecation warnings
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false # Prevents macOS failures from cancelling Windows/Ubuntu
       matrix:
         os: [ windows-latest, ubuntu-latest, macos-latest ]
 
@@ -70,19 +75,20 @@ jobs:
         shell: bash
         run: npm version ${{ env.APP_VERSION }} --no-git-tag-version --allow-same-version
 
-      # Bundle a custom JRE using jlink directly into the runtime folder
+      # 1. Bundle a custom JRE using jlink FIRST
+      # CRITICAL: Included java.se (for Jackson) and jdk.httpserver (for API)
       - name: Create Custom JRE
         shell: bash
         run: |
           "$JAVA_HOME/bin/jlink" \
-            --add-modules java.base,java.net.http,java.logging,jdk.crypto.ec,jdk.unsupported \
+            --add-modules java.se,jdk.httpserver,jdk.crypto.ec,jdk.unsupported \
             --output electron/runtime \
             --strip-debug \
             --no-man-pages \
             --no-header-files \
             --compress=2
 
-      # Prepare the runtime folder structure
+      # 2. THEN prepare the app folder inside the newly created runtime directory
       - name: Prepare Runtime Directory
         shell: bash
         run: |
