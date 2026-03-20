@@ -24,6 +24,7 @@ let backendProcess = null;
 let backendPort = null;
 let backendToken = null;
 let isQuitting = false;
+let splashWindow = null;
 const PORT_FILE_PATH = path.join(os.tmpdir(), '.lmo-port');
 
 function getBackendPaths() {
@@ -145,6 +146,14 @@ function startBackend() {
     });
 }
 
+function createSplashWindow() {
+    splashWindow = new BrowserWindow({
+        width: 400, height: 500, transparent: true, frame: false, alwaysOnTop: true,
+        icon: path.join(__dirname, '../frontend/src/assets/lmo_icon.png')
+    });
+    splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+}
+
 function createWindow() {
     const mainWindow = new BrowserWindow({
         width: 1400,
@@ -152,6 +161,7 @@ function createWindow() {
         title: 'Latent Model Organizer',
         icon: path.join(__dirname, '../frontend/src/assets/lmo_icon.png'),
         frame: false,
+        show: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -167,9 +177,17 @@ function createWindow() {
             console.error('[main] Failed to load index.html:', e);
         });
     }
+
+    mainWindow.once('ready-to-show', () => {
+        if (splashWindow && !splashWindow.isDestroyed()) {
+            splashWindow.close();
+        }
+        mainWindow.show();
+    });
 }
 
 app.whenReady().then(async () => {
+    createSplashWindow();
     await startBackend();
 
     ipcMain.handle('dialog:selectFolder', async () => {
