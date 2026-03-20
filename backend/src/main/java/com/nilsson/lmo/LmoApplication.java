@@ -20,7 +20,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -88,11 +87,7 @@ public class LmoApplication {
             ModelAnalyzer modelAnalyzer = new ModelAnalyzer();
             OrganizationService organizationService = new OrganizationService(modelAnalyzer);
 
-            HttpServer server = HttpServer.create(
-                    new InetSocketAddress(InetAddress.getLoopbackAddress(), 0),
-                    0
-            );
-
+            HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
 
             var securityFilter = new SecurityFilter(HANDSHAKE_TOKEN);
@@ -118,7 +113,7 @@ public class LmoApplication {
             Runtime.getRuntime().addShutdownHook(new Thread(LmoApplication::deletePortFile));
 
             logger.info("Latent Model Organizer Backend started on port {} with token {}", assignedPort, HANDSHAKE_TOKEN);
-            logger.info("Ready to accept requests at http://localhost:{}", assignedPort);
+            logger.info("Ready to accept requests at http://127.0.0.1:{}", assignedPort);
 
         } catch (IOException e) {
             logger.error("Failed to start server", e);

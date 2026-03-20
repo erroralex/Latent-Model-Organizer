@@ -12,42 +12,16 @@ A high-performance, ultra-low-memory desktop utility designed to wrangle massive
 ## 📸 Interface
 
 <p align="center">
-  <img src="frontend/src/assets/screenshots/hero_view.png" width="800" alt="Main Organizer Interface">
+  <img src="frontend/src/assets/screenshots/Organizer-LMO.png" width="800" alt="Main Organizer Interface">
   <br>
   <i>Sleek, frameless desktop UI with tabbed navigation for Sorting and Fetching.</i>
 </p>
 
-### Powerful & Transparent Operations
-
 <p align="center">
-  <img src="frontend/src/assets/screenshots/dry_run.png" width="800" alt="Dry Run Summary Modal">
+  <img src="frontend/src/assets/screenshots/Fetcher-LMO.png" width="800" alt="CivitAi Fetcher">
   <br>
-  <i><b>Dry Run & Summaries:</b> Simulate massive file operations safely and view detailed post-run statistics.</i>
+  <i><b>Fetcher:</b> Fetches metadata and preview images from Civitai.</i>
 </p>
-
-<p align="center">
-  <img src="frontend/src/assets/screenshots/sse_console.png" width="800" alt="Live Telemetry Console">
-  <br>
-  <i><b>Live Telemetry:</b> Real-time Java backend logs streamed directly to the UI via Server-Sent Events (SSE).</i>
-</p>
-
-<details>
-<summary><b>View More Features (Civitai Fetcher & Custom Themes)</b></summary>
-<br>
-
-<p align="center">
-  <img src="frontend/src/assets/screenshots/fetcher_mode.png" width="800" alt="Civitai Fetcher Mode">
-  <br>
-  <i><b>Metadata Fetcher:</b> Automatically identify unknown models via SHA256 hashing and download missing previews from Civitai.</i>
-</p>
-
-<p align="center">
-  <img src="frontend/src/assets/screenshots/custom_themes.png" width="800" alt="Custom Themes">
-  <br>
-  <i>Choose between Deep Neon, Premium Gold, and Fanfiction themes instantly without reloading.</i>
-</p>
-
-</details>
 
 ---
 
