@@ -58,7 +58,7 @@ const operationReport   = ref(null);
 const canUndo           = ref(false);
 const lastTargetDirectory = ref(lsGet('lmo:lastTargetDir', ''));
 
-const apiBase = ref('');
+const apiBase = ref('http://localhost:8080'); // Dev fallback
 const apiToken = ref('');
 
 watch(isProcessing, (newValue) => {
@@ -75,7 +75,7 @@ const callApi = async (endpoint, body, msg) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiToken.value}`
+        ...(apiToken.value ? { 'Authorization': `Bearer ${apiToken.value}` } : {})
       },
       body: JSON.stringify(body),
     });
@@ -98,7 +98,9 @@ const cancelOperation = async () => {
   try {
     const res = await fetch(`${apiBase.value}/api/cancel`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiToken.value}` },
+      headers: {
+        ...(apiToken.value ? { 'Authorization': `Bearer ${apiToken.value}` } : {})
+      },
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'Failed to send cancel signal.');
@@ -158,21 +160,25 @@ const minimizeWindow = () => window.windowAPI?.minimize();
 const maximizeWindow = () => window.windowAPI?.maximize();
 const closeWindow    = () => window.windowAPI?.close();
 
-onMounted(async () => {
-  applyTheme(currentTheme.value);
-
-  if (window.electronAPI?.getBackendPort) {
+async function initializeBackend() {
+  if (window.electronAPI && window.electronAPI.getBackendPort) {
     try {
-      const result = await window.electronAPI.getBackendPort();
-      if (result && result.port) {
-        apiBase.value = `http://127.0.0.1:${result.port}`;
-        apiToken.value = result.token || '';
-        console.log(`[App] Backend API base resolved to: ${apiBase.value}`);
+      const backend = await window.electronAPI.getBackendPort();
+      if (backend && backend.port) {
+        apiBase.value = `http://127.0.0.1:${backend.port}`;
+        apiToken.value = backend.token;
+        console.log(`[LMO] Bound to backend at ${apiBase.value}`);
       }
-    } catch (err) {
-      console.warn('[App] Could not retrieve backend port from main process:', err);
+    } catch (e) {
+      console.error('[LMO] Failed to retrieve backend port via IPC:', e);
+      statusMessage.value = '❌ Failed to connect to backend.';
     }
   }
+}
+
+onMounted(async () => {
+  applyTheme(currentTheme.value);
+  await initializeBackend();
 });
 
 const statusClass = computed(() => {
@@ -268,7 +274,7 @@ const closeReport = () => {
                  :class="{
                   'pi-check-circle':         statusMessage.startsWith('✅'),
                   'pi-exclamation-triangle': statusMessage.startsWith('⚠️'),
-                  'pi-times-circle':         statusMessage.startsWith('❌'),
+  'pi-times-circle':         statusMessage.startsWith('❌'),
                   'pi-info-circle':          statusMessage === 'Ready.',
                   'pi-spin pi-spinner':      isProcessing,
                 }"
