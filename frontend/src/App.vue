@@ -316,6 +316,8 @@ const closeReport = () => {
         :availableThemes="availableThemes"
         :isRecursive="isRecursive"
         :isDryRun="isDryRun"
+        :apiBase="apiBase"
+        :apiToken="apiToken"
         @applyTheme="applyTheme"
         @update:isRecursive="v => isRecursive = v"
         @update:isDryRun="v => isDryRun = v"

@@ -27,6 +27,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -62,6 +63,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>{@code GET  /api/logs}     - Server-Sent Events stream for real-time operation logging.</li>
  *   <li>{@code GET  /api/progress} - Real-time polling endpoint for operation status.</li>
  *   <li>{@code GET  /api/architectures} - Returns the list of supported architectures.</li>
+ *   <li>{@code GET  /api/version} - Returns the application version from the pom.xml.</li>
  *   <li>{@code POST /api/shutdown} - Initiates a graceful termination sequence.</li>
  *   <li>{@code POST /api/cancel} - Sends a cancellation signal to the active long-running operation.</li>
  * </ul>
@@ -99,6 +101,7 @@ public class LmoApplication {
             createSecureContext(server, "/api/logs", new LogStreamHandler(), securityFilter);
             createSecureContext(server, "/api/progress", new ProgressHandler(), securityFilter);
             createSecureContext(server, "/api/architectures", new ArchitectureHandler(modelAnalyzer), securityFilter);
+            createSecureContext(server, "/api/version", new VersionHandler(), securityFilter);
             createSecureContext(server, "/api/shutdown", new ShutdownHandler(server), securityFilter);
 
             server.start();
@@ -363,6 +366,39 @@ public class LmoApplication {
                 return;
             }
             sendJson(exchange, 200, modelAnalyzer.getAllArchitectures());
+        }
+    }
+
+    static class VersionHandler implements HttpHandler {
+        private static String version = null;
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            addCorsHeaders(exchange);
+            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                if (version == null) {
+                    version = readVersionFromPom();
+                }
+                sendJson(exchange, 200, Map.of("version", version));
+            } else {
+                sendError(exchange, 405, "Method Not Allowed");
+            }
+        }
+
+        private String readVersionFromPom() {
+            try (InputStream input = LmoApplication.class.getResourceAsStream(
+                    "/META-INF/maven/com.nilsson.lmo/backend/pom.properties")) {
+                if (input == null) {
+                    logger.warn("pom.properties not found, version will be 'dev'");
+                    return "dev";
+                }
+                Properties prop = new Properties();
+                prop.load(input);
+                return prop.getProperty("version", "dev");
+            } catch (IOException ex) {
+                logger.error("Failed to read pom.properties", ex);
+                return "dev";
+            }
         }
     }
 
