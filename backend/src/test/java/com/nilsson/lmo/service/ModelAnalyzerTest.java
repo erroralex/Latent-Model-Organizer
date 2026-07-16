@@ -92,4 +92,97 @@ class ModelAnalyzerTest {
 
         assertEquals("Unknown", metadata.architecture());
     }
+
+    @Test
+    void analyze_shouldIdentifyKrea2ViaHeuristics() throws IOException {
+        Path modelFile = tempDir.resolve("krea2_style.safetensors");
+        Files.writeString(modelFile, "dummy data");
+
+        ModelMetadata metadata = modelAnalyzer.analyze(modelFile);
+
+        assertEquals("Krea 2", metadata.architecture());
+    }
+
+    @Test
+    void analyze_shouldIdentifyKrea2ViaSidecar() throws IOException {
+        Path modelFile = tempDir.resolve("krea_model.safetensors");
+        Path sidecarFile = tempDir.resolve("krea_model.civitai.info");
+        Files.writeString(modelFile, "dummy data");
+        Files.writeString(sidecarFile, "{\"baseModel\": \"Krea 2\"}");
+
+        ModelMetadata metadata = modelAnalyzer.analyze(modelFile);
+
+        assertEquals("Krea 2", metadata.architecture());
+        assertEquals("Krea 2", metadata.baseModel());
+    }
+
+    @Test
+    void analyze_shouldIdentifyKrea2ViaSafetensorsHeader() throws IOException {
+        Path modelFile = tempDir.resolve("krea_header.safetensors");
+        String jsonHeader = "{\"__metadata__\": {\"ss_base_model_version\": \"Krea 2\"}}";
+        byte[] headerBytes = jsonHeader.getBytes();
+
+        ByteBuffer buffer = ByteBuffer.allocate(8 + headerBytes.length).order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putLong(headerBytes.length);
+        buffer.put(headerBytes);
+
+        Files.write(modelFile, buffer.array());
+
+        ModelMetadata metadata = modelAnalyzer.analyze(modelFile);
+
+        assertEquals("Krea 2", metadata.architecture());
+    }
+
+    @Test
+    void analyze_shouldIdentifyNewModelsViaHeuristics() throws IOException {
+        // Wan 2.7 Video and Image
+        Path wanVideoFile = tempDir.resolve("wan2.7_t2v_test.safetensors");
+        Files.writeString(wanVideoFile, "dummy");
+        assertEquals("Wan Video 2.7", modelAnalyzer.analyze(wanVideoFile).architecture());
+
+        Path wanImageFile = tempDir.resolve("wan_image2.7_test.safetensors");
+        Files.writeString(wanImageFile, "dummy");
+        assertEquals("Wan Image 2.7", modelAnalyzer.analyze(wanImageFile).architecture());
+
+        // LTXV 2.3
+        Path ltxvFile = tempDir.resolve("ltx_2.3_video.safetensors");
+        Files.writeString(ltxvFile, "dummy");
+        assertEquals("LTXV 2.3", modelAnalyzer.analyze(ltxvFile).architecture());
+
+        // Qwen 2
+        Path qwenFile = tempDir.resolve("qwen2_lora.safetensors");
+        Files.writeString(qwenFile, "dummy");
+        assertEquals("Qwen 2", modelAnalyzer.analyze(qwenFile).architecture());
+
+        // HiDream-O1
+        Path hiDreamFile = tempDir.resolve("hidream-o1_style.safetensors");
+        Files.writeString(hiDreamFile, "dummy");
+        assertEquals("HiDream-O1", modelAnalyzer.analyze(hiDreamFile).architecture());
+
+        // Ideogram 4.0
+        Path ideogramFile = tempDir.resolve("ideogram4.0_model.safetensors");
+        Files.writeString(ideogramFile, "dummy");
+        assertEquals("Ideogram 4.0", modelAnalyzer.analyze(ideogramFile).architecture());
+
+        // Grok
+        Path grokFile = tempDir.resolve("grok_model.safetensors");
+        Files.writeString(grokFile, "dummy");
+        assertEquals("Grok", modelAnalyzer.analyze(grokFile).architecture());
+    }
+
+    @Test
+    void analyze_shouldIdentifyNewModelsViaSidecar() throws IOException {
+        Path modelFile = tempDir.resolve("test_model.safetensors");
+        Path sidecarFile = tempDir.resolve("test_model.civitai.info");
+        Files.writeString(modelFile, "dummy");
+
+        Files.writeString(sidecarFile, "{\"baseModel\": \"Wan Video 2.7\"}");
+        assertEquals("Wan Video 2.7", modelAnalyzer.analyze(modelFile).architecture());
+
+        Files.writeString(sidecarFile, "{\"baseModel\": \"LTXV 2.3\"}");
+        assertEquals("LTXV 2.3", modelAnalyzer.analyze(modelFile).architecture());
+
+        Files.writeString(sidecarFile, "{\"baseModel\": \"Qwen 2\"}");
+        assertEquals("Qwen 2", modelAnalyzer.analyze(modelFile).architecture());
+    }
 }

@@ -47,15 +47,18 @@ public class ModelAnalyzer {
     public static final List<String> SUPPORTED_ARCHITECTURES = List.of(
             "Flux .2 Klein 9B-base", "Flux .2 Klein 9B", "Flux .2 Klein 4B-base", "Flux .2 Klein 4B", "Flux .2 D",
             "Flux .1 Kontext", "Flux .1 Krea", "Flux .1 S", "Flux .1 D",
+            "Krea 2",
+            "Wan Video 2.7", "Wan Image 2.7",
             "Wan Video 2.5 I2V", "Wan Video 2.5 T2V", "Wan Video 2.2 I2V-A14B", "Wan Video 2.2 TI2V-5B",
             "Wan Video 2.2 T2V-A14B", "Wan Video 14B i2v 720p", "Wan Video 14B i2v 480p", "Wan Video 14B t2v",
             "Wan Video 1.3B t2v",
             "SDXL Lightning", "SDXL Hyper", "SDXL Turbo", "SDXL 1.0",
             "SD 3.5", "SD 2.1", "SD 2.0", "SD 1.5 Hyper", "SD 1.5 LCM", "SD 1.5", "SD 1.4",
             "Pony V7", "Pony", "Illustrious", "NoobAI", "Sana",
-            "LTXV2", "LTXV", "Mochi", "CogVideoX", "Hunyuan Video", "Hunyuan 1",
-            "HiDream", "PixArt Σ", "PixArt α", "Aura Flow", "Lumina", "Kolors",
-            "Chroma", "Anima", "Qwen", "Z Image Base", "Z Image Turbo",
+            "LTXV 2.3", "LTXV2", "LTXV", "Mochi", "CogVideoX", "Hunyuan Video", "Hunyuan 1",
+            "HiDream-O1", "HiDream", "PixArt Σ", "PixArt α", "Aura Flow", "Lumina", "Kolors",
+            "Chroma", "Anima", "Qwen 2", "Qwen", "Z Image Base", "Z Image Turbo",
+            "Ideogram 4.0", "Grok",
             "Uncategorized", "Unknown"
     );
 
@@ -118,6 +121,10 @@ public class ModelAnalyzer {
     private String checkFilenameHeuristics(String filename) {
         String lower = filename.toLowerCase();
 
+        if (lower.contains("krea") && (lower.contains("2") || lower.contains("two"))) {
+            return "Krea 2";
+        }
+
         if (lower.contains("flux.2") || lower.contains("flux_2") || lower.contains("flux-2")) {
             if (lower.contains("klein")) {
                 if (lower.contains("9b-base") || lower.contains("9b_base")) return "Flux .2 Klein 9B-base";
@@ -142,6 +149,10 @@ public class ModelAnalyzer {
         }
 
         if (lower.contains("wan")) {
+            if (lower.contains("2.7") || lower.contains("2_7")) {
+                if (lower.contains("image")) return "Wan Image 2.7";
+                return "Wan Video 2.7";
+            }
             if (lower.contains("2.5") && lower.contains("i2v")) return "Wan Video 2.5 I2V";
             if (lower.contains("2.5") && lower.contains("t2v")) return "Wan Video 2.5 T2V";
             if (lower.contains("2.2") && lower.contains("i2v") && lower.contains("a14b"))
@@ -187,6 +198,7 @@ public class ModelAnalyzer {
         if (lower.contains("illustrious")) return "Illustrious";
         if (lower.contains("noob")) return "NoobAI";
 
+        if (lower.contains("ltx") && (lower.contains("2.3") || lower.contains("2_3"))) return "LTXV 2.3";
         if (lower.contains("ltxv2") || lower.contains("ltx-v2") || lower.contains("ltx_v2")) return "LTXV2";
         if (lower.contains("ltx-2") || lower.contains("ltx_2") || lower.contains("ltx2")) return "LTXV2";
         if (lower.contains("ltxv") || lower.contains("ltx-video") || lower.contains("ltx_video")) return "LTXV";
@@ -197,7 +209,10 @@ public class ModelAnalyzer {
         if (lower.contains("hunyuan") && lower.contains("video")) return "Hunyuan Video";
         if (lower.contains("hunyuan")) return "Hunyuan 1";
 
-        if (lower.contains("hidream") || lower.contains("hi-dream") || lower.contains("hi_dream")) return "HiDream";
+        if (lower.contains("hidream") || lower.contains("hi-dream") || lower.contains("hi_dream")) {
+            if (lower.contains("o1") || lower.contains("o-1")) return "HiDream-O1";
+            return "HiDream";
+        }
         if (lower.contains("pixart") && (lower.contains("sigma") || lower.contains("σ"))) return "PixArt Σ";
         if (lower.contains("pixart")) return "PixArt α";
         if (lower.contains("auraflow") || lower.contains("aura-flow") || lower.contains("aura_flow"))
@@ -207,7 +222,12 @@ public class ModelAnalyzer {
         if (lower.contains("sana")) return "Sana";
         if (lower.contains("chroma")) return "Chroma";
         if (lower.contains("anima")) return "Anima";
-        if (lower.contains("qwen")) return "Qwen";
+        if (lower.contains("qwen")) {
+            if (lower.contains("2")) return "Qwen 2";
+            return "Qwen";
+        }
+        if (lower.contains("ideogram")) return "Ideogram 4.0";
+        if (lower.contains("grok")) return "Grok";
 
         if (isZImageBase(lower)) return "Z Image Base";
         if (isZImageTurbo(lower)) return "Z Image Turbo";
@@ -368,7 +388,15 @@ public class ModelAnalyzer {
             return "Flux .1 D";
         }
 
+        if (upper.contains("KREA 2") || (upper.contains("KREA") && upper.contains("2"))) {
+            return "Krea 2";
+        }
+
         if (upper.contains("WAN")) {
+            if (upper.contains("2.7")) {
+                if (upper.contains("IMAGE")) return "Wan Image 2.7";
+                return "Wan Video 2.7";
+            }
             if (upper.contains("2.5") && upper.contains("I2V")) return "Wan Video 2.5 I2V";
             if (upper.contains("2.5") && upper.contains("T2V")) return "Wan Video 2.5 T2V";
             if (upper.contains("2.2") && upper.contains("I2V") && upper.contains("A14B"))
@@ -414,6 +442,7 @@ public class ModelAnalyzer {
         if (upper.contains("V1-4") || upper.contains("SD1.4") || upper.contains("SD 1.4") || upper.contains("SD14"))
             return "SD 1.4";
 
+        if (upper.contains("LTX") && (upper.contains("2.3") || upper.contains("2_3"))) return "LTXV 2.3";
         if (upper.contains("LTXV2") || upper.contains("LTX-V2") || upper.contains("LTX_V2")) return "LTXV2";
         if (upper.contains("LTX-2") || upper.contains("LTX_2") || upper.contains("LTX2")) return "LTXV2";
         if (upper.contains("LTXV") || upper.contains("LTX-VIDEO") || upper.contains("LTX_VIDEO")) return "LTXV";
@@ -423,7 +452,10 @@ public class ModelAnalyzer {
         if (upper.contains("HUNYUAN") && upper.contains("VIDEO")) return "Hunyuan Video";
         if (upper.contains("HUNYUAN")) return "Hunyuan 1";
 
-        if (upper.contains("HIDREAM") || upper.contains("HI-DREAM") || upper.contains("HI_DREAM")) return "HiDream";
+        if (upper.contains("HIDREAM") || upper.contains("HI-DREAM") || upper.contains("HI_DREAM")) {
+            if (upper.contains("O1") || upper.contains("O-1")) return "HiDream-O1";
+            return "HiDream";
+        }
         if (upper.contains("PIXART") && (upper.contains("SIGMA") || upper.contains("Σ"))) return "PixArt Σ";
         if (upper.contains("PIXART")) return "PixArt α";
         if (upper.contains("AURAFLOW") || upper.contains("AURA FLOW") || upper.contains("AURA_FLOW"))
@@ -432,7 +464,12 @@ public class ModelAnalyzer {
         if (upper.contains("KOLORS")) return "Kolors";
         if (upper.contains("CHROMA")) return "Chroma";
         if (upper.contains("ANIMA")) return "Anima";
-        if (upper.contains("QWEN")) return "Qwen";
+        if (upper.contains("QWEN")) {
+            if (upper.contains("2")) return "Qwen 2";
+            return "Qwen";
+        }
+        if (upper.contains("IDEOGRAM")) return "Ideogram 4.0";
+        if (upper.contains("GROK")) return "Grok";
 
         if (isZImageBase(upper.toLowerCase())) return "Z Image Base";
         if (isZImageTurbo(upper.toLowerCase())) return "Z Image Turbo";

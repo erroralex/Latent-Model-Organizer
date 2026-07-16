@@ -49,3 +49,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# =========================
+# Claude Code Skills Link
+# =========================
+.claude/skills/
+
+# =========================
+# Temporary Drop-in Brain Kit
+# =========================
+drop-in-brain-main/
