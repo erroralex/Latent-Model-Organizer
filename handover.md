@@ -54,9 +54,10 @@ Added sorting and Civitai metadata mapping for several new base models and archi
 
 ---
 
-## 4. Release 1.1.0
+## 4. Releases
 
-Cut and published the first release since v1.0.0, covering the Krea 2 and new base model support above.
+v1.1.0 was the first release since v1.0.0, covering the Krea 2 and new base model support above.
+v1.2.0 followed with the Forge user-metadata work.
 
 ### Process (source of truth for future releases)
 
@@ -94,6 +95,28 @@ Cut and published the first release since v1.0.0, covering the Krea 2 and new ba
 - Preview files now keep the extension the URL serves, so Civitai's `.mp4` animated previews
   stop being written as undecodable `.png` (section 7).
 - Shared IntelliJ run configurations under `.run/` (section 6).
+- Tagged as `v1.2.0` on the `main` merge commit (`46c287d`) — release build triggered
+  via GitHub Actions.
+
+**Verified against a real library after release:** the backfill was run over the reference
+Forge Neo install and filled the previously-empty models; the previously broken animated
+previews now render. Both features are confirmed working outside the test suite.
+
+### A trap when tagging
+
+`build.yml` reads the version from the pom **on the tagged commit**, so a tag placed on a
+`main` that has not yet received the version bump publishes a release whose name and artifacts
+disagree. This happened once: a PR was opened before the bump was pushed, so the merge brought
+in an older `development` and `main` still read `1.1.0`.
+
+Always confirm the version on the exact commit being tagged, not merely that `main` looks
+current:
+
+```bash
+git fetch origin
+git show origin/main:backend/pom.xml | grep -m1 "<version>"
+git log --oneline origin/main..origin/development   # must be empty
+```
 
 ---
 
