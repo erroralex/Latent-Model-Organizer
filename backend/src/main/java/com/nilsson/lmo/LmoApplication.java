@@ -8,6 +8,7 @@ import com.nilsson.lmo.domain.OperationReport;
 import com.nilsson.lmo.domain.OrganizationRequest;
 import com.nilsson.lmo.domain.UndoRequest;
 import com.nilsson.lmo.exception.OrganizerException;
+import com.nilsson.lmo.service.ActivationTextBackfillService;
 import com.nilsson.lmo.service.ModelAnalyzer;
 import com.nilsson.lmo.service.OrganizationService;
 import com.sun.net.httpserver.HttpExchange;
@@ -60,6 +61,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>{@code POST /api/organize} - Categorises and relocates models based on architectural heuristics.</li>
  *   <li>{@code POST /api/undo}     - Reverses the most recent organisational run using a persistent manifest.</li>
  *   <li>{@code POST /api/fetch}    - Retrieves missing sidecar metadata and preview images from external APIs.</li>
+ *   <li>{@code POST /api/backfill-triggers} - Writes trigger words from existing sidecars into Forge user metadata.</li>
  *   <li>{@code GET  /api/logs}     - Server-Sent Events stream for real-time operation logging.</li>
  *   <li>{@code GET  /api/progress} - Real-time polling endpoint for operation status.</li>
  *   <li>{@code GET  /api/architectures} - Returns the list of supported architectures.</li>
@@ -88,6 +90,7 @@ public class LmoApplication {
         try {
             ModelAnalyzer modelAnalyzer = new ModelAnalyzer();
             OrganizationService organizationService = new OrganizationService(modelAnalyzer);
+            ActivationTextBackfillService backfillService = new ActivationTextBackfillService();
 
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
@@ -97,6 +100,7 @@ public class LmoApplication {
             createSecureContext(server, "/api/organize", new OrganizeHandler(organizationService), securityFilter);
             createSecureContext(server, "/api/undo", new UndoHandler(organizationService), securityFilter);
             createSecureContext(server, "/api/fetch", new FetchHandler(organizationService), securityFilter);
+            createSecureContext(server, "/api/backfill-triggers", new BackfillTriggersHandler(backfillService), securityFilter);
             createSecureContext(server, "/api/cancel", new CancelHandler(), securityFilter);
             createSecureContext(server, "/api/logs", new LogStreamHandler(), securityFilter);
             createSecureContext(server, "/api/progress", new ProgressHandler(), securityFilter);
@@ -302,6 +306,63 @@ public class LmoApplication {
                 sendError(exchange, 400, e.getMessage());
             } catch (Exception e) {
                 logger.error("Internal server error during fetch", e);
+                sendError(exchange, 500, "Internal Server Error: " + e.getMessage());
+            }
+        }
+    }
+
+    static class BackfillTriggersHandler implements HttpHandler {
+        private final ActivationTextBackfillService backfillService;
+
+        public BackfillTriggersHandler(ActivationTextBackfillService backfillService) {
+            this.backfillService = backfillService;
+        }
+
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            addCorsHeaders(exchange);
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendError(exchange, 405, "Method Not Allowed");
+                return;
+            }
+
+            try (InputStream requestBody = exchange.getRequestBody()) {
+                FetchRequest request = objectMapper.readValue(requestBody, FetchRequest.class);
+                logger.info("Received trigger word backfill request: {}", request);
+
+                if (request.targetDirectory() == null) {
+                    sendError(exchange, 400, "Target directory is required.");
+                    return;
+                }
+
+                cancelRequested.set(false);
+                progressProcessed.set(0);
+                progressTotal.set(0);
+                progressActive = true;
+
+                OperationReport report;
+                try {
+                    report = backfillService.backfillActivationText(
+                            Paths.get(request.targetDirectory()),
+                            request.isRecursive(),
+                            request.isDryRun(),
+                            cancelRequested::get,
+                            progressTotal::set,
+                            progressProcessed::incrementAndGet
+                    );
+                } finally {
+                    progressActive = false;
+                }
+                sendJson(exchange, 200, report);
+            } catch (OrganizerException e) {
+                logger.error("Business logic error during trigger word backfill", e);
+                sendError(exchange, 400, e.getMessage());
+            } catch (Exception e) {
+                logger.error("Internal server error during trigger word backfill", e);
                 sendError(exchange, 500, "Internal Server Error: " + e.getMessage());
             }
         }

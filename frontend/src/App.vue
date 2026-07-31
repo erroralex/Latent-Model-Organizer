@@ -157,6 +157,18 @@ const handleStartFetch = ({ targetDirectory }) => {
   );
 };
 
+const handleStartBackfill = ({ targetDirectory }) => {
+  if (!targetDirectory) {
+    statusMessage.value = '⚠️ Please select a folder to scan.';
+    return;
+  }
+  callApi(
+      '/api/backfill-triggers',
+      { targetDirectory, isRecursive: isRecursive.value, isDryRun: isDryRun.value },
+      '⏳ Writing trigger words from existing sidecars...'
+  );
+};
+
 const minimizeWindow = () => window.windowAPI?.minimize();
 const maximizeWindow = () => window.windowAPI?.maximize();
 const closeWindow    = () => window.windowAPI?.close();
@@ -274,6 +286,7 @@ const closeReport = () => {
                     @update:isRecursive="v => isRecursive = v"
                     @update:isDryRun="v => isDryRun = v"
                     @start-fetch="handleStartFetch"
+                    @start-backfill="handleStartBackfill"
                     @cancel-operation="cancelOperation"
                 />
               </div>
