@@ -8,7 +8,7 @@ import com.nilsson.lmo.domain.OperationReport;
 import com.nilsson.lmo.domain.OrganizationRequest;
 import com.nilsson.lmo.domain.UndoRequest;
 import com.nilsson.lmo.exception.OrganizerException;
-import com.nilsson.lmo.service.ActivationTextBackfillService;
+import com.nilsson.lmo.service.UserMetadataBackfillService;
 import com.nilsson.lmo.service.ModelAnalyzer;
 import com.nilsson.lmo.service.OrganizationService;
 import com.sun.net.httpserver.HttpExchange;
@@ -61,7 +61,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *   <li>{@code POST /api/organize} - Categorises and relocates models based on architectural heuristics.</li>
  *   <li>{@code POST /api/undo}     - Reverses the most recent organisational run using a persistent manifest.</li>
  *   <li>{@code POST /api/fetch}    - Retrieves missing sidecar metadata and preview images from external APIs.</li>
- *   <li>{@code POST /api/backfill-triggers} - Writes trigger words from existing sidecars into Forge user metadata.</li>
+ *   <li>{@code POST /api/backfill-metadata} - Writes trigger words and descriptions from existing sidecars into Forge user metadata.</li>
  *   <li>{@code GET  /api/logs}     - Server-Sent Events stream for real-time operation logging.</li>
  *   <li>{@code GET  /api/progress} - Real-time polling endpoint for operation status.</li>
  *   <li>{@code GET  /api/architectures} - Returns the list of supported architectures.</li>
@@ -90,7 +90,7 @@ public class LmoApplication {
         try {
             ModelAnalyzer modelAnalyzer = new ModelAnalyzer();
             OrganizationService organizationService = new OrganizationService(modelAnalyzer);
-            ActivationTextBackfillService backfillService = new ActivationTextBackfillService();
+            UserMetadataBackfillService backfillService = new UserMetadataBackfillService();
 
             HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
@@ -100,7 +100,7 @@ public class LmoApplication {
             createSecureContext(server, "/api/organize", new OrganizeHandler(organizationService), securityFilter);
             createSecureContext(server, "/api/undo", new UndoHandler(organizationService), securityFilter);
             createSecureContext(server, "/api/fetch", new FetchHandler(organizationService), securityFilter);
-            createSecureContext(server, "/api/backfill-triggers", new BackfillTriggersHandler(backfillService), securityFilter);
+            createSecureContext(server, "/api/backfill-metadata", new BackfillMetadataHandler(backfillService), securityFilter);
             createSecureContext(server, "/api/cancel", new CancelHandler(), securityFilter);
             createSecureContext(server, "/api/logs", new LogStreamHandler(), securityFilter);
             createSecureContext(server, "/api/progress", new ProgressHandler(), securityFilter);
@@ -311,10 +311,10 @@ public class LmoApplication {
         }
     }
 
-    static class BackfillTriggersHandler implements HttpHandler {
-        private final ActivationTextBackfillService backfillService;
+    static class BackfillMetadataHandler implements HttpHandler {
+        private final UserMetadataBackfillService backfillService;
 
-        public BackfillTriggersHandler(ActivationTextBackfillService backfillService) {
+        public BackfillMetadataHandler(UserMetadataBackfillService backfillService) {
             this.backfillService = backfillService;
         }
 
@@ -346,7 +346,7 @@ public class LmoApplication {
 
                 OperationReport report;
                 try {
-                    report = backfillService.backfillActivationText(
+                    report = backfillService.backfillUserMetadata(
                             Paths.get(request.targetDirectory()),
                             request.isRecursive(),
                             request.isDryRun(),

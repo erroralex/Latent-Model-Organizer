@@ -86,28 +86,34 @@ Cut and published the first release since v1.0.0, covering the Krea 2 and new ba
 
 ---
 
-## 5. LoRA Trigger Words
+## 5. LoRA Trigger Words & Descriptions
 
-Civitai's `by-hash` response already contains a `trainedWords` array, and the fetcher already
-wrote the whole response to `<basename>.civitai.info`. The trigger words were therefore on disk
-but invisible to the WebUI.
+Civitai's `by-hash` response already contains a `trainedWords` array and two description fields,
+and the fetcher already wrote the whole response to `<basename>.civitai.info`. Both were
+therefore on disk but invisible to the WebUI.
 
 **Why:** A1111 / Forge / Forge Neo never read `.civitai.info` — that format belongs to the
 Civitai Helper extension. Verified against a local Forge Neo install: `modules/extra_networks.py`
 `get_user_metadata()` reads exactly one file, `<basename>.json`, and
 `extensions-builtin/sd_forge_lora/ui_edit_user_metadata.py` populates the "Activation text" box
-from its `"activation text"` key.
+from its `"activation text"` key and the "Description" box from `"description"`.
 
 ### What was added
 
 - **`ForgeUserMetadataWriter`** — joins `trainedWords` with `,, ` (the Civitai section convention
-  that the Card Master extension splits on) and merge-writes `<basename>.json`. Existing keys and
-  any user-authored activation text are preserved; writes go through a temp file + atomic move.
-- **`ActivationTextBackfillService`** + `POST /api/backfill-triggers` — an offline pass over
+  that the Card Master extension splits on), converts the description to plain text, and
+  merge-writes `<basename>.json`. Each field is filled only when blank, so anything the user
+  wrote survives; writes go through a temp file + atomic move. Returns a `WriteOutcome` naming
+  which fields were added, so callers can tally them separately.
+- **`HtmlToPlainText`** — Civitai serves descriptions as HTML, and the WebUI escapes them by
+  default (`extra_networks_card_description_is_html` defaults to `false` in
+  `modules/shared_options.py`), so raw markup would render as literal `<p>` tags on every card.
+  A small dependency-free converter reduces them to text.
+- **`UserMetadataBackfillService`** + `POST /api/backfill-metadata` — an offline pass over
   existing `.civitai.info` sidecars. No hashing, no network, idempotent, so it is safe to re-run.
   Needed because `fetchMissingMetadata` skips any model that already has a sidecar, which on a
   mature library is nearly all of them.
-- **Fetcher UI** — a "Trigger Words" section with a `Backfill Trigger Words` button, reusing the
+- **Fetcher UI** — a "Trigger Words & Descriptions" section with a backfill button, reusing the
   existing Deep Scan / Dry Run toggles.
 
 ### Gotchas discovered
@@ -117,6 +123,9 @@ from its `"activation text"` key.
   surrounding commas and whitespace (regression tests cover this).
 - Do **not** write the `sd version` key. Forge Neo has diverged from upstream: the editor saves
   `"sd version"` but `read_user_metadata` looks for `sd_version_str`.
+- There are **two** description fields. `model.description` is the model page text (present in
+  1260 of 1764 sidecars in the reference library); the top-level `description` is a short version
+  note (592). The model one wins, with the version note as fallback — they are not concatenated.
 
 ---
 

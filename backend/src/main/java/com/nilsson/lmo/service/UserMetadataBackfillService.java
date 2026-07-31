@@ -19,7 +19,7 @@ import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
- * <p>The {@code ActivationTextBackfillService} retrofits an existing model library with the
+ * <p>The {@code UserMetadataBackfillService} retrofits an existing model library with the
  * trigger words it already owns. Every {@code .civitai.info} sidecar downloaded by the fetcher
  * contains a {@code trainedWords} array, but AUTOMATIC1111, Forge, and Forge Neo never read that
  * file — they read {@code <basename>.json}. This service bridges the two, purely from local
@@ -32,29 +32,30 @@ import java.util.stream.Stream;
  * @see ForgeUserMetadataWriter
  * @see OrganizationService#fetchMissingMetadata
  */
-public class ActivationTextBackfillService {
+public class UserMetadataBackfillService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ActivationTextBackfillService.class);
+    private static final Logger logger = LoggerFactory.getLogger(UserMetadataBackfillService.class);
 
     private static final String SIDECAR_SUFFIX = ".civitai.info";
     private static final String MODEL_EXTENSION = ".safetensors";
     private static final int MAX_SCAN_DEPTH = 4;
 
-    private static final String STAT_SAVED = "Trigger Words Saved";
-    private static final String STAT_SIMULATED = "Simulated Writes";
-    private static final String STAT_ALREADY_SET = "Skipped (already set)";
-    private static final String STAT_NO_WORDS = "Skipped (no trigger words)";
+    private static final String STAT_TRIGGER_WORDS = "Trigger Words Saved";
+    private static final String STAT_DESCRIPTIONS = "Descriptions Saved";
+    private static final String STAT_TRIGGER_WORDS_DRY = "Trigger Words (simulated)";
+    private static final String STAT_DESCRIPTIONS_DRY = "Descriptions (simulated)";
+    private static final String STAT_NOTHING_TO_ADD = "Nothing to Add";
     private static final String STAT_MODEL_MISSING = "Skipped (model missing)";
     private static final String STAT_ERRORS = "Errors";
 
     private final ForgeUserMetadataWriter userMetadataWriter;
     private final ObjectMapper objectMapper;
 
-    public ActivationTextBackfillService() {
+    public UserMetadataBackfillService() {
         this(new ForgeUserMetadataWriter(), new ObjectMapper());
     }
 
-    public ActivationTextBackfillService(ForgeUserMetadataWriter userMetadataWriter, ObjectMapper objectMapper) {
+    public UserMetadataBackfillService(ForgeUserMetadataWriter userMetadataWriter, ObjectMapper objectMapper) {
         this.userMetadataWriter = userMetadataWriter;
         this.objectMapper = objectMapper;
     }
@@ -78,7 +79,7 @@ public class ActivationTextBackfillService {
      *
      * @return a report tallying writes and each distinct skip reason
      */
-    public OperationReport backfillActivationText(Path targetDir, boolean isRecursive, boolean isDryRun,
+    public OperationReport backfillUserMetadata(Path targetDir, boolean isRecursive, boolean isDryRun,
                                                   Supplier<Boolean> isCancelled, IntConsumer onTotalKnown,
                                                   Runnable onItemComplete) {
         logger.info("Starting trigger word backfill. Recursive: {}, Dry Run: {}", isRecursive, isDryRun);
@@ -136,16 +137,17 @@ public class ActivationTextBackfillService {
             }
 
             JsonNode rootNode = objectMapper.readTree(sidecar.toFile());
+            var outcome = userMetadataWriter.writeUserMetadata(rootNode, modelPath, baseName, isDryRun);
 
-            if (!hasTriggerWords(rootNode)) {
-                increment(stats, STAT_NO_WORDS);
+            if (!outcome.wroteAnything()) {
+                increment(stats, STAT_NOTHING_TO_ADD);
                 return;
             }
-
-            if (userMetadataWriter.writeActivationTextIfAbsent(rootNode, modelPath, baseName, isDryRun)) {
-                increment(stats, isDryRun ? STAT_SIMULATED : STAT_SAVED);
-            } else {
-                increment(stats, STAT_ALREADY_SET);
+            if (outcome.activationTextWritten()) {
+                increment(stats, isDryRun ? STAT_TRIGGER_WORDS_DRY : STAT_TRIGGER_WORDS);
+            }
+            if (outcome.descriptionWritten()) {
+                increment(stats, isDryRun ? STAT_DESCRIPTIONS_DRY : STAT_DESCRIPTIONS);
             }
 
         } catch (Exception e) {
@@ -154,19 +156,6 @@ public class ActivationTextBackfillService {
             errors.add(msg);
             increment(stats, STAT_ERRORS);
         }
-    }
-
-    private static boolean hasTriggerWords(JsonNode rootNode) {
-        JsonNode trainedWords = rootNode.path("trainedWords");
-        if (!trainedWords.isArray()) {
-            return false;
-        }
-        for (JsonNode word : trainedWords) {
-            if (word.isTextual() && !word.asText().isBlank()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private OperationReport cancelledReport(Map<String, Integer> stats, List<String> errors) {

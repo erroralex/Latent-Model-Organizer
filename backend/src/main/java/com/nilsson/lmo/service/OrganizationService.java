@@ -596,8 +596,12 @@ public class OrganizationService {
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
             downloadPreviewImageIfAbsent(rootNode, modelPath, baseName);
 
-            if (forgeUserMetadataWriter.writeActivationTextIfAbsent(rootNode, modelPath, baseName)) {
+            var outcome = forgeUserMetadataWriter.writeUserMetadata(rootNode, modelPath, baseName);
+            if (outcome.activationTextWritten()) {
                 stats.computeIfAbsent("Trigger Words Saved", k -> new AtomicInteger(0)).incrementAndGet();
+            }
+            if (outcome.descriptionWritten()) {
+                stats.computeIfAbsent("Descriptions Saved", k -> new AtomicInteger(0)).incrementAndGet();
             }
 
         } catch (Exception e) {

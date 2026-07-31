@@ -10,12 +10,12 @@
  * - Target Selection: Allows the user to specify a directory for metadata scanning.
  * - Process Initiation: Triggers the backend fetch operation using SHA-256 hashing and API lookups.
  * - In-Place Updates: Downloads sidecar files (.civitai.info and preview images) directly next to the model files.
- * - Trigger Word Backfill: Converts already-downloaded sidecars into the .json user metadata Forge reads.
+ * - Metadata Backfill: Converts already-downloaded sidecars into the .json user metadata Forge reads.
  * - Visual Feedback: Displays informational boxes explaining the non-destructive nature of the fetch process.
  *
  * @see App.vue
  * @see CivitaiApiClient.java
- * @see ActivationTextBackfillService.java
+ * @see UserMetadataBackfillService.java
  */
 import { ref, watch } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
@@ -111,16 +111,17 @@ const handleBackfill = () => {
     </div>
 
     <section class="secondary-action">
-      <h3 class="subsection-title">Trigger Words</h3>
+      <h3 class="subsection-title">Trigger Words &amp; Descriptions</h3>
       <p class="helper-text">
         Forge and A1111 don't read <code>.civitai.info</code> files — they read <code>&lt;model&gt;.json</code>.
-        This writes the trigger words from sidecars you already have into that file, where the LoRA card's
-        <strong>Activation text</strong> field picks them up. No hashing and no downloads, so it's fast and
-        safe to re-run; an activation text you set yourself is never overwritten.
+        This writes the trigger words and description from sidecars you already have into that file, where the
+        LoRA card's <strong>Activation text</strong> and <strong>Description</strong> fields pick them up.
+        No hashing and no downloads, so it's fast and safe to re-run; anything you filled in yourself is
+        never overwritten.
       </p>
       <button class="secondary-btn backfill-btn" @click="handleBackfill" :disabled="isProcessing">
         <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-tags'"></i>
-        Backfill Trigger Words
+        Backfill Trigger Words &amp; Descriptions
       </button>
     </section>
 
@@ -128,11 +129,15 @@ const handleBackfill = () => {
       <p>This tool performs a smart scan of your model library to find files missing Civitai metadata.</p><br>
       <p>It calculates a highly optimized <strong>SHA256 hash</strong> of the model file, queries the Civitai API, and downloads the official metadata JSON and preview image.</p><br>
       <p>Files are updated in-place. No models are moved during this process.</p><br>
-      <p><strong>Trigger Words</strong> is a separate, offline pass. Stable Diffusion front-ends never read
-        <code>.civitai.info</code> sidecars — that format belongs to the Civitai Helper extension. They read
-        <code>&lt;model&gt;.json</code> instead. The backfill copies the <code>trainedWords</code> already stored
-        in your sidecars into that file so they appear in each LoRA's <strong>Activation text</strong> box.</p><br>
-      <p>Existing metadata is merged, not replaced: notes, preferred weight, and any activation text you wrote
+      <p><strong>Trigger Words &amp; Descriptions</strong> is a separate, offline pass. Stable Diffusion front-ends
+        never read <code>.civitai.info</code> sidecars — that format belongs to the Civitai Helper extension. They
+        read <code>&lt;model&gt;.json</code> instead. The backfill copies the <code>trainedWords</code> and model
+        description already stored in your sidecars into that file, so they appear in each LoRA's
+        <strong>Activation text</strong> and <strong>Description</strong> boxes.</p><br>
+      <p>Civitai serves descriptions as HTML, which the WebUI escapes by default, so they are converted to plain
+        text first. The model description is preferred; the version's release note is used only when the model
+        has none.</p><br>
+      <p>Existing metadata is merged, not replaced: notes, preferred weight, and any field you filled in
         yourself are left untouched.</p>
     </InfoModal>
 

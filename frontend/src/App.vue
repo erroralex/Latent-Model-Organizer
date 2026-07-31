@@ -163,9 +163,9 @@ const handleStartBackfill = ({ targetDirectory }) => {
     return;
   }
   callApi(
-      '/api/backfill-triggers',
+      '/api/backfill-metadata',
       { targetDirectory, isRecursive: isRecursive.value, isDryRun: isDryRun.value },
-      '⏳ Writing trigger words from existing sidecars...'
+      '⏳ Writing trigger words and descriptions from existing sidecars...'
   );
 };
 

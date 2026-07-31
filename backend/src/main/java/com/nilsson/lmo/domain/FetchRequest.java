@@ -13,7 +13,7 @@ import com.nilsson.lmo.service.OrganizationService;
  * <h2>Communication Contract</h2>
  * <p>
  * This record defines the immutable input structure for the {@code /api/fetch} and
- * {@code /api/backfill-triggers} endpoints, specifying the scope and operational mode of the
+ * {@code /api/backfill-metadata} endpoints, specifying the scope and operational mode of the
  * background metadata services. Both take the same parameters: a directory, a traversal depth,
  * and a simulation flag.
  * </p>
