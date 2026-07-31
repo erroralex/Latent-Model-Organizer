@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run Latent Organizer Stack" type="CompoundRunConfigurationType">
+    <toRun name="1. Backend (Java)" type="Application" />
+    <toRun name="2. Frontend (Vite)" type="js.build_tools.npm" />
+    <toRun name="3. Electron (Desktop)" type="js.build_tools.npm" />
+    <method v="2" />
+  </configuration>
+</component>

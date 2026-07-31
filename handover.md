@@ -46,8 +46,10 @@ Added sorting and Civitai metadata mapping for several new base models and archi
 - **Setup Doctor Checklist:** Checked via the `ai-setup-doctor` skill: **10/10 PASS**.
 - **Backend Unit Tests:** Ran all 29 unit tests in the `backend/` directory:
   ```powershell
-  & "C:\Program Files\JetBrains\IntelliJ IDEA 2025.2.3\plugins\maven\lib\maven3\bin\mvn.cmd" test
+  & "C:\Program Files\JetBrains\IntelliJ IDEA 2025.2.3\plugins\maven-plugin\lib\maven3\bin\mvn.cmd" test
   ```
+  (The bundled Maven lives under `plugins\maven-plugin\`, not `plugins\maven\`; the folder
+  was renamed in recent IntelliJ builds. There is no standalone `mvn` on the PATH.)
   Result: **BUILD SUCCESS** (29 tests run, 0 failures).
 
 ---
@@ -81,3 +83,55 @@ Cut and published the first release since v1.0.0, covering the Krea 2 and new ba
   just ships it).
 - Tagged and pushed as `v1.1.0` on the `main` merge commit — release build triggered
   via GitHub Actions.
+
+---
+
+## 5. LoRA Trigger Words
+
+Civitai's `by-hash` response already contains a `trainedWords` array, and the fetcher already
+wrote the whole response to `<basename>.civitai.info`. The trigger words were therefore on disk
+but invisible to the WebUI.
+
+**Why:** A1111 / Forge / Forge Neo never read `.civitai.info` — that format belongs to the
+Civitai Helper extension. Verified against a local Forge Neo install: `modules/extra_networks.py`
+`get_user_metadata()` reads exactly one file, `<basename>.json`, and
+`extensions-builtin/sd_forge_lora/ui_edit_user_metadata.py` populates the "Activation text" box
+from its `"activation text"` key.
+
+### What was added
+
+- **`ForgeUserMetadataWriter`** — joins `trainedWords` with `,, ` (the Civitai section convention
+  that the Card Master extension splits on) and merge-writes `<basename>.json`. Existing keys and
+  any user-authored activation text are preserved; writes go through a temp file + atomic move.
+- **`ActivationTextBackfillService`** + `POST /api/backfill-triggers` — an offline pass over
+  existing `.civitai.info` sidecars. No hashing, no network, idempotent, so it is safe to re-run.
+  Needed because `fetchMissingMetadata` skips any model that already has a sidecar, which on a
+  mature library is nearly all of them.
+- **Fetcher UI** — a "Trigger Words" section with a `Backfill Trigger Words` button, reusing the
+  existing Deep Scan / Dry Run toggles.
+
+### Gotchas discovered
+
+- Many Civitai authors leave a **trailing comma** on each `trainedWords` entry. Joining verbatim
+  produced `,,,` runs that shift Card Master's section boundaries; entries are now stripped of
+  surrounding commas and whitespace (regression tests cover this).
+- Do **not** write the `sd version` key. Forge Neo has diverged from upstream: the editor saves
+  `"sd version"` but `read_user_metadata` looks for `sd_version_str`.
+
+---
+
+## 6. IntelliJ Run Configurations
+
+Run configurations now live in **`.run/`** as shared, committed files rather than in the
+gitignored `.idea/workspace.xml`.
+
+The previous setup was broken: the backend configuration pinned
+`ALTERNATIVE_JRE_PATH="liberica-full-21"` and declared no `<module>`, producing
+"Configuration is still incorrect" on launch. That SDK name exists only in the jdk.table of
+IntelliJ 2025.3+; opening the project in 2025.2.3 leaves it unresolved. The shared configs
+declare `<module name="backend" />` and pin no alternative JRE, so they inherit the project SDK
+and work across IDE versions.
+
+`.idea/misc.xml` still names `project-jdk-name="liberica-21"`, which has the same problem. If the
+project SDK shows as unresolved, add `C:\Users\error\.jdks\liberica-full-21.0.12` under
+File → Project Structure → SDKs and name it `liberica-21`.
