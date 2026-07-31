@@ -144,3 +144,44 @@ and work across IDE versions.
 `.idea/misc.xml` still names `project-jdk-name="liberica-21"`, which has the same problem. If the
 project SDK shows as unresolved, add `C:\Users\error\.jdks\liberica-full-21.0.12` under
 File → Project Structure → SDKs and name it `liberica-21`.
+
+**Still outstanding:** on opening the shared config, IntelliJ 2025.2.3 stripped the
+`<module name="backend" />` element back out. The backend Maven project is **not imported** in
+that IDE — `.idea/modules.xml` lists only `frontend` and the root module, there is no
+`backend.iml`, and external module storage is empty. The module is therefore unresolvable by any
+name, and an Application configuration without a module has no classpath.
+
+To finish the fix: open the Maven tool window and add `backend/pom.xml`, then re-point the
+configuration at the resulting module (named after the artifactId,
+`latent-model-organizer-backend`, not `backend`). Until then the backend must be launched from
+the command line: `java -jar backend/target/backend.jar`.
+
+---
+
+## 7. Preview Files
+
+`resolvePreviewExtension` recognised only jpg/jpeg/webp and defaulted everything else to
+`.preview.png`. Civitai serves animated previews as `.mp4`, so video bytes were written into
+files named `.png` — undecodable, and the card rendered "NO PREVIEW". The extension is now taken
+from the URL's final path segment, accepting the same media set as the WebUI's
+`default_allowed_preview_extensions`.
+
+### Do NOT switch this to `images[0].type`
+
+It looks like the authoritative signal and is not. `type` describes what the **author uploaded**;
+the URL describes what the **CDN will return**, and only the latter can determine the filename.
+
+In the reference library 27 sidecars have `type: "video"` but only 6 have a `.mp4` URL. The other
+26 carry a `.jpeg` URL with a `width=450` transform, and Civitai returns a **still frame** — the
+bytes on disk are genuinely JPEG. Keying the extension off `type` would rename those 26 working
+previews to `.mp4`, turning 4 broken previews into 30.
+
+The genuinely authoritative signal, if this ever needs hardening, is the response's
+`Content-Type` header — but it requires downloading before naming, and no case has been observed
+where the URL suffix disagreed with the actual bytes in a way that broke rendering.
+
+### Pre-existing mislabelling (harmless)
+
+1715 preview files have content that does not match their extension, almost all `jpeg` bytes in
+`.preview.png` — the Civitai Helper extension names every preview `.preview.png` regardless of
+content. These render correctly because browsers sniff content type. Not worth renaming.
