@@ -49,3 +49,35 @@ Added sorting and Civitai metadata mapping for several new base models and archi
   & "C:\Program Files\JetBrains\IntelliJ IDEA 2025.2.3\plugins\maven\lib\maven3\bin\mvn.cmd" test
   ```
   Result: **BUILD SUCCESS** (29 tests run, 0 failures).
+
+---
+
+## 4. Release 1.1.0
+
+Cut and published the first release since v1.0.0, covering the Krea 2 and new base model support above.
+
+### Process (source of truth for future releases)
+
+- Version lives in **`backend/pom.xml`** only. `build.yml` reads it via
+  `mvn help:evaluate -Dexpression=project.version` and syncs it into
+  `electron/package.json` and `frontend/package.json` at build time via
+  `npm version --no-git-tag-version` — no need to hand-edit those files.
+- Release flow:
+  1. Bump `<version>` in `backend/pom.xml` on `development`, commit, push.
+  2. Open a PR from `development` into `main` (repo convention: one PR per merge,
+     visible in `git log` as `Merge pull request #N from erroralex/development`).
+  3. After merge, tag the merge commit on `main` as `vX.Y.Z` and push the tag:
+     `git tag -a vX.Y.Z <commit> -m "..."` then `git push origin vX.Y.Z`.
+  4. Pushing the tag triggers `.github/workflows/build.yml`, which builds
+     Windows/Linux/macOS artifacts and publishes a GitHub Release automatically.
+- `gh` CLI is **not installed** on this machine — PRs must be opened manually via
+  the GitHub compare URL (`https://github.com/erroralex/Latent-Model-Organizer/compare/main...development`).
+
+### What shipped in 1.1.0
+
+- Version bump `1.0.0` → `1.1.0` (`backend/pom.xml`).
+- Krea 2, Wan Video/Image 2.7, LTXV 2.3, Qwen 2, HiDream-O1, Ideogram 4.0, and
+  Grok architecture support (already implemented in section 2 above; this release
+  just ships it).
+- Tagged and pushed as `v1.1.0` on the `main` merge commit — release build triggered
+  via GitHub Actions.
