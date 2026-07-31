@@ -63,6 +63,52 @@ class OrganizationServiceTest {
         Files.createDirectories(targetDir);
     }
 
+    /**
+     * Civitai serves animated previews as {@code .mp4}. Naming those {@code .preview.png}
+     * produces a file the browser cannot decode, so the card renders "NO PREVIEW" — even
+     * though Forge lists {@code mp4} and {@code webm} among its allowed preview extensions
+     * and renders them in a {@code <video>} tag.
+     */
+    @Test
+    void resolvePreviewExtension_shouldKeepVideoExtensions() {
+        assertEquals(".preview.mp4",
+                OrganizationService.resolvePreviewExtension("https://image.civitai.com/abc/original=true/136292598.mp4"));
+        assertEquals(".preview.webm",
+                OrganizationService.resolvePreviewExtension("https://image.civitai.com/abc/clip.webm"));
+    }
+
+    @Test
+    void resolvePreviewExtension_shouldMapImageExtensions() {
+        assertEquals(".preview.jpeg", OrganizationService.resolvePreviewExtension("https://x/img.jpg"));
+        assertEquals(".preview.jpeg", OrganizationService.resolvePreviewExtension("https://x/img.jpeg"));
+        assertEquals(".preview.webp", OrganizationService.resolvePreviewExtension("https://x/img.webp"));
+        assertEquals(".preview.png", OrganizationService.resolvePreviewExtension("https://x/img.png"));
+        assertEquals(".preview.gif", OrganizationService.resolvePreviewExtension("https://x/img.gif"));
+        assertEquals(".preview.avif", OrganizationService.resolvePreviewExtension("https://x/img.avif"));
+    }
+
+    @Test
+    void resolvePreviewExtension_shouldIgnoreCaseAndQueryStrings() {
+        assertEquals(".preview.mp4", OrganizationService.resolvePreviewExtension("https://x/CLIP.MP4?width=450"));
+        assertEquals(".preview.jpeg", OrganizationService.resolvePreviewExtension("https://x/img.JPG#frag"));
+    }
+
+    /** Dots in earlier path segments must not be mistaken for the file extension. */
+    @Test
+    void resolvePreviewExtension_shouldOnlyConsiderTheFinalPathSegment() {
+        assertEquals(".preview.mp4",
+                OrganizationService.resolvePreviewExtension("https://image.civitai.com/v1.2/original=true/clip.mp4"));
+        assertEquals(".preview.png",
+                OrganizationService.resolvePreviewExtension("https://image.civitai.com/v1.2/original=true/12345678"));
+    }
+
+    @Test
+    void resolvePreviewExtension_shouldFallBackToPngForUnknownOrMissingExtensions() {
+        assertEquals(".preview.png", OrganizationService.resolvePreviewExtension("https://x/12345678"));
+        assertEquals(".preview.png", OrganizationService.resolvePreviewExtension("https://x/file.bin"));
+        assertEquals(".preview.png", OrganizationService.resolvePreviewExtension("https://x/trailing."));
+    }
+
     @Test
     void organizeModels_shouldRelocateModelAndSidecars() throws IOException {
         Path modelFile = sourceDir.resolve("test_model.safetensors");

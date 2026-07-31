@@ -175,8 +175,7 @@ public class CivitaiApiClient implements AutoCloseable {
 
     /**
      * Downloads the first preview image from a Civitai API response node if no
-     * preview file already exists for this model. Replaces the cross-package
-     * dependency on {@code OrganizationService.resolvePreviewExtension()}.
+     * preview file already exists for this model.
      *
      * @param rootNode
      *         the parsed Civitai API JSON response
@@ -201,10 +200,7 @@ public class CivitaiApiClient implements AutoCloseable {
     }
 
     private static String resolvePreviewExtension(String imageUrl) {
-        String lower = imageUrl.toLowerCase();
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return ".preview.jpeg";
-        if (lower.endsWith(".webp")) return ".preview.webp";
-        return ".preview.png";
+        return OrganizationService.resolvePreviewExtension(imageUrl);
     }
 
     public String hashWithTiming(Path modelPath) throws IOException {

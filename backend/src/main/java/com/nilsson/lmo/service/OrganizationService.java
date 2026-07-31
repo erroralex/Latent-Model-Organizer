@@ -63,6 +63,16 @@ public class OrganizationService {
 
     public static final String UNDO_MANIFEST_FILENAME = "undo-manifest.json";
 
+    /**
+     * Media types a Stable Diffusion front-end will render as a card preview. Mirrors
+     * {@code default_allowed_preview_extensions} in the WebUI's {@code ui_extra_networks.py}.
+     */
+    private static final Set<String> PREVIEW_EXTENSIONS =
+            Set.of("png", "jpg", "jpeg", "webp", "jxl", "avif", "heif", "gif", "mp4", "webm");
+
+    /** Both spellings are stored under the single {@code .preview.jpeg} name. */
+    private static final Set<String> JPEG_ALIASES = Set.of("jpg", "jpeg");
+
     private final ModelAnalyzer modelAnalyzer;
     private final CivitaiApiClient civitaiApiClient;
     private final ForgeUserMetadataWriter forgeUserMetadataWriter;
@@ -649,11 +659,50 @@ public class OrganizationService {
                 .equals(targetDir.toAbsolutePath().normalize());
     }
 
+    /**
+     * Derives the sidecar preview extension from a Civitai media URL.
+     *
+     * <p>The extension is taken from the URL rather than assumed, because Civitai serves
+     * animated previews as {@code .mp4}. Naming those {@code .png} yields a file no browser
+     * can decode, and the card renders "NO PREVIEW" — despite Forge listing {@code mp4} and
+     * {@code webm} among its allowed preview extensions and rendering them in a
+     * {@code <video>} tag.</p>
+     *
+     * @param imageUrl
+     *         the media URL from the Civitai response
+     *
+     * @return the sidecar suffix, e.g. {@code ".preview.mp4"}; {@code ".preview.png"} when the
+     * URL carries no extension this application recognises
+     */
     static String resolvePreviewExtension(String imageUrl) {
-        String lower = imageUrl.toLowerCase();
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return ".preview.jpeg";
-        if (lower.endsWith(".webp")) return ".preview.webp";
-        return ".preview.png";
+        String extension = extractUrlExtension(imageUrl);
+
+        if (JPEG_ALIASES.contains(extension)) {
+            return ".preview.jpeg";
+        }
+        return PREVIEW_EXTENSIONS.contains(extension) ? ".preview." + extension : ".preview.png";
+    }
+
+    /** @return the lowercase extension of the URL's final path segment, or an empty string. */
+    private static String extractUrlExtension(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return "";
+        }
+
+        String path = imageUrl;
+        for (String delimiter : new String[]{"#", "?"}) {
+            int cut = path.indexOf(delimiter);
+            if (cut >= 0) {
+                path = path.substring(0, cut);
+            }
+        }
+
+        String lastSegment = path.substring(path.lastIndexOf('/') + 1);
+        int dot = lastSegment.lastIndexOf('.');
+        if (dot < 0 || dot == lastSegment.length() - 1) {
+            return "";
+        }
+        return lastSegment.substring(dot + 1).toLowerCase(Locale.ROOT);
     }
 
     private static Set<String> buildAllowedSet(List<String> allowedArchitectures) {
