@@ -84,6 +84,17 @@ Cut and published the first release since v1.0.0, covering the Krea 2 and new ba
 - Tagged and pushed as `v1.1.0` on the `main` merge commit — release build triggered
   via GitHub Actions.
 
+### What shipped in 1.2.0
+
+- Version bump `1.1.0` → `1.2.0` (`backend/pom.xml`).
+- Trigger words and Civitai descriptions written into the `<basename>.json` user metadata that
+  A1111 / Forge / Forge Neo actually read (section 5).
+- `POST /api/backfill-metadata` and a Fetcher UI action to retrofit an existing library from
+  sidecars already on disk, without hashing or network calls.
+- Preview files now keep the extension the URL serves, so Civitai's `.mp4` animated previews
+  stop being written as undecodable `.png` (section 7).
+- Shared IntelliJ run configurations under `.run/` (section 6).
+
 ---
 
 ## 5. LoRA Trigger Words & Descriptions
