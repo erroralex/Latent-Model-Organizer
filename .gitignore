@@ -59,3 +59,8 @@ pnpm-debug.log*
 # Temporary Drop-in Brain Kit
 # =========================
 drop-in-brain-main/
+
+# =========================
+# Maven Shade generated POM
+# =========================
+backend/dependency-reduced-pom.xml

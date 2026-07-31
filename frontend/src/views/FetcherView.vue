@@ -10,10 +10,12 @@
  * - Target Selection: Allows the user to specify a directory for metadata scanning.
  * - Process Initiation: Triggers the backend fetch operation using SHA-256 hashing and API lookups.
  * - In-Place Updates: Downloads sidecar files (.civitai.info and preview images) directly next to the model files.
+ * - Metadata Backfill: Converts already-downloaded sidecars into the .json user metadata Forge reads.
  * - Visual Feedback: Displays informational boxes explaining the non-destructive nature of the fetch process.
  *
  * @see App.vue
  * @see CivitaiApiClient.java
+ * @see UserMetadataBackfillService.java
  */
 import { ref, watch } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
@@ -25,7 +27,7 @@ const props = defineProps({
   isDryRun: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['start-fetch', 'cancel-operation', 'update:isRecursive', 'update:isDryRun', 'open-info']);
+const emit = defineEmits(['start-fetch', 'start-backfill', 'cancel-operation', 'update:isRecursive', 'update:isDryRun', 'open-info']);
 
 const lsGet = (k, fb) => { try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : fb; } catch { return fb; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -39,6 +41,12 @@ const pickTarget = async () => { const f = await window.electronAPI?.selectFolde
 
 const handleExecute = () => {
   emit('start-fetch', {
+    targetDirectory: targetFolder.value
+  });
+};
+
+const handleBackfill = () => {
+  emit('start-backfill', {
     targetDirectory: targetFolder.value
   });
 };
@@ -102,10 +110,35 @@ const handleExecute = () => {
       </button>
     </div>
 
+    <section class="secondary-action">
+      <h3 class="subsection-title">Trigger Words &amp; Descriptions</h3>
+      <p class="helper-text">
+        Forge and A1111 don't read <code>.civitai.info</code> files — they read <code>&lt;model&gt;.json</code>.
+        This writes the trigger words and description from sidecars you already have into that file, where the
+        LoRA card's <strong>Activation text</strong> and <strong>Description</strong> fields pick them up.
+        No hashing and no downloads, so it's fast and safe to re-run; anything you filled in yourself is
+        never overwritten.
+      </p>
+      <button class="secondary-btn backfill-btn" @click="handleBackfill" :disabled="isProcessing">
+        <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-tags'"></i>
+        Backfill Trigger Words &amp; Descriptions
+      </button>
+    </section>
+
     <InfoModal v-if="showInfo" title="Metadata Fetcher Info" @close="showInfo = false">
       <p>This tool performs a smart scan of your model library to find files missing Civitai metadata.</p><br>
       <p>It calculates a highly optimized <strong>SHA256 hash</strong> of the model file, queries the Civitai API, and downloads the official metadata JSON and preview image.</p><br>
-      <p>Files are updated in-place. No models are moved during this process.</p>
+      <p>Files are updated in-place. No models are moved during this process.</p><br>
+      <p><strong>Trigger Words &amp; Descriptions</strong> is a separate, offline pass. Stable Diffusion front-ends
+        never read <code>.civitai.info</code> sidecars — that format belongs to the Civitai Helper extension. They
+        read <code>&lt;model&gt;.json</code> instead. The backfill copies the <code>trainedWords</code> and model
+        description already stored in your sidecars into that file, so they appear in each LoRA's
+        <strong>Activation text</strong> and <strong>Description</strong> boxes.</p><br>
+      <p>Civitai serves descriptions as HTML, which the WebUI escapes by default, so they are converted to plain
+        text first. The model description is preferred; the version's release note is used only when the model
+        has none.</p><br>
+      <p>Existing metadata is merged, not replaced: notes, preferred weight, and any field you filled in
+        yourself are left untouched.</p>
     </InfoModal>
 
   </div>
@@ -122,6 +155,24 @@ const handleExecute = () => {
 .cancel-btn {
   border-color: var(--status-error-faded);
   color: var(--status-error);
+}
+.secondary-action {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-light);
+}
+.subsection-title {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.secondary-action .helper-text {
+  margin-bottom: 14px;
+}
+.backfill-btn {
+  width: 100%;
+  justify-content: center;
 }
 .cancel-btn:hover:not(:disabled) {
   background: var(--status-error-faded);

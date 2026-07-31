@@ -46,8 +46,10 @@ Added sorting and Civitai metadata mapping for several new base models and archi
 - **Setup Doctor Checklist:** Checked via the `ai-setup-doctor` skill: **10/10 PASS**.
 - **Backend Unit Tests:** Ran all 29 unit tests in the `backend/` directory:
   ```powershell
-  & "C:\Program Files\JetBrains\IntelliJ IDEA 2025.2.3\plugins\maven\lib\maven3\bin\mvn.cmd" test
+  & "C:\Program Files\JetBrains\IntelliJ IDEA 2025.2.3\plugins\maven-plugin\lib\maven3\bin\mvn.cmd" test
   ```
+  (The bundled Maven lives under `plugins\maven-plugin\`, not `plugins\maven\`; the folder
+  was renamed in recent IntelliJ builds. There is no standalone `mvn` on the PATH.)
   Result: **BUILD SUCCESS** (29 tests run, 0 failures).
 
 ---
@@ -81,3 +83,105 @@ Cut and published the first release since v1.0.0, covering the Krea 2 and new ba
   just ships it).
 - Tagged and pushed as `v1.1.0` on the `main` merge commit — release build triggered
   via GitHub Actions.
+
+---
+
+## 5. LoRA Trigger Words & Descriptions
+
+Civitai's `by-hash` response already contains a `trainedWords` array and two description fields,
+and the fetcher already wrote the whole response to `<basename>.civitai.info`. Both were
+therefore on disk but invisible to the WebUI.
+
+**Why:** A1111 / Forge / Forge Neo never read `.civitai.info` — that format belongs to the
+Civitai Helper extension. Verified against a local Forge Neo install: `modules/extra_networks.py`
+`get_user_metadata()` reads exactly one file, `<basename>.json`, and
+`extensions-builtin/sd_forge_lora/ui_edit_user_metadata.py` populates the "Activation text" box
+from its `"activation text"` key and the "Description" box from `"description"`.
+
+### What was added
+
+- **`ForgeUserMetadataWriter`** — joins `trainedWords` with `,, ` (the Civitai section convention
+  that the Card Master extension splits on), converts the description to plain text, and
+  merge-writes `<basename>.json`. Each field is filled only when blank, so anything the user
+  wrote survives; writes go through a temp file + atomic move. Returns a `WriteOutcome` naming
+  which fields were added, so callers can tally them separately.
+- **`HtmlToPlainText`** — Civitai serves descriptions as HTML, and the WebUI escapes them by
+  default (`extra_networks_card_description_is_html` defaults to `false` in
+  `modules/shared_options.py`), so raw markup would render as literal `<p>` tags on every card.
+  A small dependency-free converter reduces them to text.
+- **`UserMetadataBackfillService`** + `POST /api/backfill-metadata` — an offline pass over
+  existing `.civitai.info` sidecars. No hashing, no network, idempotent, so it is safe to re-run.
+  Needed because `fetchMissingMetadata` skips any model that already has a sidecar, which on a
+  mature library is nearly all of them.
+- **Fetcher UI** — a "Trigger Words & Descriptions" section with a backfill button, reusing the
+  existing Deep Scan / Dry Run toggles.
+
+### Gotchas discovered
+
+- Many Civitai authors leave a **trailing comma** on each `trainedWords` entry. Joining verbatim
+  produced `,,,` runs that shift Card Master's section boundaries; entries are now stripped of
+  surrounding commas and whitespace (regression tests cover this).
+- Do **not** write the `sd version` key. Forge Neo has diverged from upstream: the editor saves
+  `"sd version"` but `read_user_metadata` looks for `sd_version_str`.
+- There are **two** description fields. `model.description` is the model page text (present in
+  1260 of 1764 sidecars in the reference library); the top-level `description` is a short version
+  note (592). The model one wins, with the version note as fallback — they are not concatenated.
+
+---
+
+## 6. IntelliJ Run Configurations
+
+Run configurations now live in **`.run/`** as shared, committed files rather than in the
+gitignored `.idea/workspace.xml`.
+
+The previous setup was broken: the backend configuration pinned
+`ALTERNATIVE_JRE_PATH="liberica-full-21"` and declared no `<module>`, producing
+"Configuration is still incorrect" on launch. That SDK name exists only in the jdk.table of
+IntelliJ 2025.3+; opening the project in 2025.2.3 leaves it unresolved. The shared configs
+declare `<module name="backend" />` and pin no alternative JRE, so they inherit the project SDK
+and work across IDE versions.
+
+`.idea/misc.xml` still names `project-jdk-name="liberica-21"`, which has the same problem. If the
+project SDK shows as unresolved, add `C:\Users\error\.jdks\liberica-full-21.0.12` under
+File → Project Structure → SDKs and name it `liberica-21`.
+
+**Still outstanding:** on opening the shared config, IntelliJ 2025.2.3 stripped the
+`<module name="backend" />` element back out. The backend Maven project is **not imported** in
+that IDE — `.idea/modules.xml` lists only `frontend` and the root module, there is no
+`backend.iml`, and external module storage is empty. The module is therefore unresolvable by any
+name, and an Application configuration without a module has no classpath.
+
+To finish the fix: open the Maven tool window and add `backend/pom.xml`, then re-point the
+configuration at the resulting module (named after the artifactId,
+`latent-model-organizer-backend`, not `backend`). Until then the backend must be launched from
+the command line: `java -jar backend/target/backend.jar`.
+
+---
+
+## 7. Preview Files
+
+`resolvePreviewExtension` recognised only jpg/jpeg/webp and defaulted everything else to
+`.preview.png`. Civitai serves animated previews as `.mp4`, so video bytes were written into
+files named `.png` — undecodable, and the card rendered "NO PREVIEW". The extension is now taken
+from the URL's final path segment, accepting the same media set as the WebUI's
+`default_allowed_preview_extensions`.
+
+### Do NOT switch this to `images[0].type`
+
+It looks like the authoritative signal and is not. `type` describes what the **author uploaded**;
+the URL describes what the **CDN will return**, and only the latter can determine the filename.
+
+In the reference library 27 sidecars have `type: "video"` but only 6 have a `.mp4` URL. The other
+26 carry a `.jpeg` URL with a `width=450` transform, and Civitai returns a **still frame** — the
+bytes on disk are genuinely JPEG. Keying the extension off `type` would rename those 26 working
+previews to `.mp4`, turning 4 broken previews into 30.
+
+The genuinely authoritative signal, if this ever needs hardening, is the response's
+`Content-Type` header — but it requires downloading before naming, and no case has been observed
+where the URL suffix disagreed with the actual bytes in a way that broke rendering.
+
+### Pre-existing mislabelling (harmless)
+
+1715 preview files have content that does not match their extension, almost all `jpeg` bytes in
+`.preview.png` — the Civitai Helper extension names every preview `.preview.png` regardless of
+content. These render correctly because browsers sniff content type. Not worth renaming.
