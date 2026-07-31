@@ -1,6 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="1. Backend (Java)" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="com.nilsson.lmo.LmoApplication" />
+    <module name="latent-model-organizer-backend" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
