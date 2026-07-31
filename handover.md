@@ -134,27 +134,29 @@ from its `"activation text"` key and the "Description" box from `"description"`.
 Run configurations now live in **`.run/`** as shared, committed files rather than in the
 gitignored `.idea/workspace.xml`.
 
-The previous setup was broken: the backend configuration pinned
-`ALTERNATIVE_JRE_PATH="liberica-full-21"` and declared no `<module>`, producing
-"Configuration is still incorrect" on launch. That SDK name exists only in the jdk.table of
-IntelliJ 2025.3+; opening the project in 2025.2.3 leaves it unresolved. The shared configs
-declare `<module name="backend" />` and pin no alternative JRE, so they inherit the project SDK
-and work across IDE versions.
+**Root cause of "Configuration is still incorrect":** the backend Application configuration
+declared **no `<module>`**, so it had no classpath. That alone invalidates the configuration.
+The shared config now declares `<module name="latent-model-organizer-backend" />`.
 
-`.idea/misc.xml` still names `project-jdk-name="liberica-21"`, which has the same problem. If the
-project SDK shows as unresolved, add `C:\Users\error\.jdks\liberica-full-21.0.12` under
-File → Project Structure → SDKs and name it `liberica-21`.
+**The module is named after the artifactId, not the directory.** It is
+`latent-model-organizer-backend`, not `backend` — an earlier `<module name="backend" />` was
+silently stripped by the IDE on load because no module answers to that name.
 
-**Still outstanding:** on opening the shared config, IntelliJ 2025.2.3 stripped the
-`<module name="backend" />` element back out. The backend Maven project is **not imported** in
-that IDE — `.idea/modules.xml` lists only `frontend` and the root module, there is no
-`backend.iml`, and external module storage is empty. The module is therefore unresolvable by any
-name, and an Application configuration without a module has no classpath.
+### Two things that look like causes but are not
 
-To finish the fix: open the Maven tool window and add `backend/pom.xml`, then re-point the
-configuration at the resulting module (named after the artifactId,
-`latent-model-organizer-backend`, not `backend`). Until then the backend must be launched from
-the command line: `java -jar backend/target/backend.jar`.
+- **The `ALTERNATIVE_JRE_PATH="liberica-full-21"` pin.** That SDK resolves fine. It was removed
+  anyway so the config inherits the project SDK and stays portable, but it was never the fault.
+- **`.idea/modules.xml` listing only `frontend` and the root module.** External module storage is
+  enabled (`ExternalStorageConfigurationManager`), so Maven-derived modules live outside `.idea/`
+  and never appear there. The backend module *is* imported; the file simply is not where to look.
+  Query the running IDE instead of reading `.idea/` when checking module state.
+
+Note also that the **running IDE uses the `IntelliJIdea2026.2` config directory** even though the
+binary is 2025.2.3, so `$APPDATA\JetBrains\IntelliJIdea2025.2\` is the wrong place to inspect
+SDK tables for this project.
+
+Verified by launching the configuration: the backend started and logged
+`LMO_PORT=…` normally.
 
 ---
 
