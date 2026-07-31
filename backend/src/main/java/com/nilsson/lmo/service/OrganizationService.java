@@ -65,10 +65,12 @@ public class OrganizationService {
 
     private final ModelAnalyzer modelAnalyzer;
     private final CivitaiApiClient civitaiApiClient;
+    private final ForgeUserMetadataWriter forgeUserMetadataWriter;
 
     public OrganizationService(ModelAnalyzer modelAnalyzer) {
         this.modelAnalyzer = modelAnalyzer;
         this.civitaiApiClient = new CivitaiApiClient();
+        this.forgeUserMetadataWriter = new ForgeUserMetadataWriter();
     }
 
     public OperationReport organizeModels(Path sourceDir, Path targetDir, List<String> allowedArchitectures, boolean isRecursive, boolean isDryRun) {
@@ -593,6 +595,10 @@ public class OrganizationService {
 
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
             downloadPreviewImageIfAbsent(rootNode, modelPath, baseName);
+
+            if (forgeUserMetadataWriter.writeActivationTextIfAbsent(rootNode, modelPath, baseName)) {
+                stats.computeIfAbsent("Trigger Words Saved", k -> new AtomicInteger(0)).incrementAndGet();
+            }
 
         } catch (Exception e) {
             String msg = String.format("Failed to fetch metadata for '%s': %s", fileName, e.getMessage());
