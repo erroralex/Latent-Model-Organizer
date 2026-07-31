@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.latent</groupId>
     <artifactId>latent-model-organizer-backend</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <name>Latent Model Organizer</name>
 
     <properties>
