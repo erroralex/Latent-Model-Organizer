@@ -26,6 +26,7 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
           @click="emit('update:activeTab', 'sort')"
           :disabled="isProcessing"
         >
+          <span class="active-indicator-bar" v-if="activeTab === 'sort'"></span>
           <i class="pi pi-sort-alt nav-icon"></i>
           <span>Sorter</span>
         </button>
@@ -36,6 +37,7 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
           @click="emit('update:activeTab', 'fetch')"
           :disabled="isProcessing"
         >
+          <span class="active-indicator-bar" v-if="activeTab === 'fetch'"></span>
           <i class="pi pi-cloud-download nav-icon"></i>
           <span>Fetcher</span>
         </button>
@@ -62,6 +64,7 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
           :class="{ active: showSettings }"
           @click="emit('update:showSettings', !showSettings)"
         >
+          <span class="active-indicator-bar" v-if="showSettings"></span>
           <i class="pi pi-cog nav-icon"></i>
           <span>Settings</span>
         </button>
@@ -115,43 +118,49 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
 }
 
 .nav-item-ds {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
+  padding: 9px 12px 9px 14px;
+  border-radius: var(--radius-md, 8px);
+  border: none;
   background: transparent;
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   font-size: var(--text-body-sm, 13px);
-  font-weight: var(--weight-medium, 500);
+  font-weight: var(--weight-semibold, 600);
   font-family: var(--font-sans);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-standard);
+  transition: background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
   text-align: left;
+  overflow: hidden;
 }
 
 .nav-item-ds:hover:not(:disabled) {
   color: var(--color-text-primary);
   background: var(--color-surface-1);
-  border-color: var(--color-border-subtle);
 }
 
 .nav-item-ds.active {
   color: var(--color-text-primary);
-  background: var(--color-accent-primary-bg);
-  border-color: rgba(79, 216, 208, 0.3);
-  font-weight: var(--weight-semibold);
+  background: var(--color-surface-1);
+  font-weight: var(--weight-semibold, 600);
 }
 
-.nav-item-ds.active .nav-icon {
-  color: var(--color-accent-primary);
+.active-indicator-bar {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--gradient-brand);
 }
 
 .nav-icon {
   font-size: 1.05rem;
-  color: var(--color-text-tertiary);
+  color: inherit;
   transition: color var(--duration-fast);
 }
 
@@ -159,7 +168,7 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
+  padding: 8px 12px;
   cursor: pointer;
   user-select: none;
 }
@@ -207,7 +216,7 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
   justify-content: center;
   align-items: center;
   margin-top: 12px;
-  opacity: 0.6;
+  opacity: 0.55;
   transition: opacity var(--duration-fast);
 }
 
@@ -218,5 +227,13 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
 .dev-logo-img {
   width: 64px;
   height: auto;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 </style>
