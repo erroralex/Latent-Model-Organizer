@@ -2,15 +2,7 @@
 /**
  * SorterView.vue
  *
- * The primary interface for orchestrating the model organization workflow.
- * It manages directory selection, architectural filtering, and execution logic.
- *
- * Key Capabilities:
- * - Native Directory Management: Uses Electron-native dialogs and shell integration for folder selection.
- * - Architecture Filtering: Searchable multi-select system for targeting specific model types.
- * - Progressive Execution: Toggles between standard, recursive, and simulation (dry run) modes.
- * - Real-time Status: Integrated stopwatch and asymptotic/real progress tracking via API polling.
- * - Undo Support: Direct interface to reverse the last organizational run using persistent manifests.
+ * Model Organization view for Latent Model Organizer aligned with the Latent Design System.
  */
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
@@ -92,7 +84,7 @@ const isSelected = (a) => selectedArchitectures.value.includes(a);
 const onKeydown      = (e) => { if (e.key === 'Escape') dropdownOpen.value = false; };
 const onClickOutside = (e) => {
   const clickedTrigger = dropdownRef.value && dropdownRef.value.contains(e.target);
-  const clickedPanel   = e.target.closest('.arch-panel');
+  const clickedPanel   = e.target.closest('.arch-panel-ds');
   if (!clickedTrigger && !clickedPanel) dropdownOpen.value = false;
 };
 
@@ -245,24 +237,27 @@ const handleExecute = () => {
 </script>
 
 <template>
-  <div class="tab-content">
-
-    <div class="section-header">
-      <h2 class="section-title">Model Organizer</h2>
-      <button class="info-btn" @click="showInfo = true" title="What is this?">
+  <div class="view-container-ds">
+    <div class="view-header-ds">
+      <h1 class="view-title-ds">Sorter</h1>
+      <button class="info-icon-btn" @click="showInfo = true" title="What is this?">
         <i class="pi pi-question-circle"></i>
       </button>
     </div>
 
-    <div class="form-group">
-      <label class="form-label">Source Directory <span class="label-hint">unorganized models</span></label>
-      <div class="input-row">
-        <input class="glass-input" type="text" readonly :value="sourceFolder" placeholder="Select source folder..."/>
-        <button class="secondary-btn" @click="pickSource" :disabled="isProcessing">
+    <!-- Source Directory -->
+    <div class="card-group-ds">
+      <div class="card-header-ds">
+        <span class="card-title-ds">Source Directory</span>
+        <span class="card-hint-ds">Drag & drop folder here or click to browse</span>
+      </div>
+      <div class="input-row-ds">
+        <input class="input-ds mono" type="text" readonly :value="sourceFolder" placeholder="Select source folder..."/>
+        <button class="btn-ds secondary" @click="pickSource" :disabled="isProcessing">
           <i class="pi pi-folder-open"></i> Browse
         </button>
         <button
-            class="icon-btn"
+            class="btn-ds icon-only"
             @click="openFolder(sourceFolder)"
             :disabled="!sourceFolder || isProcessing"
             title="Open folder in Explorer"
@@ -272,15 +267,19 @@ const handleExecute = () => {
       </div>
     </div>
 
-    <div class="form-group">
-      <label class="form-label">Target Directory <span class="label-hint">organized output</span></label>
-      <div class="input-row">
-        <input class="glass-input" type="text" readonly :value="targetFolder" placeholder="Select target folder..."/>
-        <button class="secondary-btn" @click="pickTarget" :disabled="isProcessing">
+    <!-- Target Directory -->
+    <div class="card-group-ds">
+      <div class="card-header-ds">
+        <span class="card-title-ds">Target Directory</span>
+        <span class="card-hint-ds">Drag & drop folder here or click to browse</span>
+      </div>
+      <div class="input-row-ds">
+        <input class="input-ds mono" type="text" readonly :value="targetFolder" placeholder="Select target folder..."/>
+        <button class="btn-ds secondary" @click="pickTarget" :disabled="isProcessing">
           <i class="pi pi-folder-open"></i> Browse
         </button>
         <button
-            class="icon-btn"
+            class="btn-ds icon-only"
             @click="openFolder(targetFolder)"
             :disabled="!targetFolder || isProcessing"
             title="Open folder in Explorer"
@@ -290,92 +289,94 @@ const handleExecute = () => {
       </div>
     </div>
 
-    <div class="form-group">
-      <label class="form-label">
-        Architectures <span class="label-hint">to sort</span>
-        <span class="label-hint" v-if="!allSelected && !noneSelected">
-          {{ selectedArchitectures.length }}/{{ ALL_ARCHS.length }}
+    <!-- Architectures Filter -->
+    <div class="card-group-ds">
+      <div class="card-header-ds">
+        <span class="card-title-ds">Architectures</span>
+        <span class="card-hint-ds" v-if="!allSelected && !noneSelected">
+          {{ selectedArchitectures.length }}/{{ ALL_ARCHS.length }} selected
         </span>
-      </label>
-      <div class="arch-dropdown" ref="dropdownRef">
+      </div>
+      <div class="arch-dropdown-ds" ref="dropdownRef">
         <button
             ref="triggerRef"
-            class="arch-trigger glass-input"
+            class="input-ds arch-trigger-ds"
             :class="{ open: dropdownOpen, 'is-none': noneSelected }"
             @click="dropdownOpen ? dropdownOpen = false : openDropdown()"
             :disabled="isProcessing"
             type="button"
         >
-          <span class="arch-trigger-text">{{ selectionSummary }}</span>
-          <span class="arch-trigger-badge" v-if="!allSelected && !noneSelected">
+          <span class="arch-summary">{{ selectionSummary }}</span>
+          <span class="badge-ds accent" v-if="!allSelected && !noneSelected">
             {{ selectedArchitectures.length }}
           </span>
-          <svg class="arch-chevron" :class="{ rotated: dropdownOpen }" viewBox="0 0 24 24">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
+          <i class="pi pi-chevron-down arch-chevron-icon" :class="{ rotated: dropdownOpen }"></i>
         </button>
         <Teleport to="body">
-          <div v-if="dropdownOpen" class="arch-panel glass-panel" :style="teleportStyle">
-            <div class="arch-panel-header">
-              <input v-model="archSearch" class="arch-search glass-input" placeholder="Search..." autofocus/>
-              <div class="arch-bulk-actions">
-                <button class="link-btn" @click="selectAll" :disabled="allSelected">All</button>
-                <span class="bulk-divider">·</span>
-                <button class="link-btn" @click="clearAll" :disabled="noneSelected">None</button>
+          <div v-if="dropdownOpen" class="arch-panel-ds" :style="teleportStyle">
+            <div class="arch-panel-header-ds">
+              <input v-model="archSearch" class="input-ds arch-search-ds" placeholder="Search architectures..." autofocus/>
+              <div class="arch-bulk-ds">
+                <button class="btn-link-ds" @click="selectAll" :disabled="allSelected">All</button>
+                <span>·</span>
+                <button class="btn-link-ds" @click="clearAll" :disabled="noneSelected">None</button>
               </div>
             </div>
-            <ul class="arch-list">
+            <ul class="arch-list-ds">
               <li
                   v-for="arch in filteredArchs"
                   :key="arch"
-                  class="arch-item"
+                  class="arch-item-ds"
                   :class="{ selected: isSelected(arch) }"
                   @click="toggleArch(arch)"
               >
-                <span class="arch-check">
-                  <svg v-if="isSelected(arch)" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                </span>
-                {{ arch }}
+                <i class="pi" :class="isSelected(arch) ? 'pi-check-square arch-check-active' : 'pi-stop arch-check-inactive'"></i>
+                <span>{{ arch }}</span>
               </li>
-              <li v-if="!filteredArchs.length" class="arch-empty">No matches for "{{ archSearch }}"</li>
+              <li v-if="!filteredArchs.length" class="arch-empty-ds">No matches for "{{ archSearch }}"</li>
             </ul>
           </div>
         </Teleport>
       </div>
+
+      <!-- Quick architecture pill preview -->
+      <div class="arch-pills-ds" v-if="selectedArchitectures.length > 0 && selectedArchitectures.length <= 10">
+        <span v-for="a in selectedArchitectures" :key="a" class="badge-ds accent">{{ a }}</span>
+      </div>
     </div>
 
-    <div class="options-row">
-      <label class="toggle-label">
+    <!-- Toggles Row -->
+    <div class="options-row-ds">
+      <label class="toggle-control-ds">
         <input type="checkbox" :checked="isRecursive" @change="emit('update:isRecursive', $event.target.checked)"
                :disabled="isProcessing" class="sr-only"/>
-        <span class="toggle-track" :class="{ checked: isRecursive }"><span class="toggle-thumb"></span></span>
-        <span>Deep Scan</span>
-        <span class="label-hint">subfolders</span>
+        <span class="toggle-track-ds" :class="{ checked: isRecursive }"><span class="toggle-thumb-ds"></span></span>
+        <span class="toggle-label-text">Deep Scan (subfolders)</span>
       </label>
-      <label class="toggle-label">
+      <label class="toggle-control-ds">
         <input type="checkbox" :checked="isDryRun" @change="emit('update:isDryRun', $event.target.checked)"
                :disabled="isProcessing" class="sr-only"/>
-        <span class="toggle-track" :class="{ checked: isDryRun }"><span class="toggle-thumb"></span></span>
-        <span>Dry Run</span>
-        <span class="label-hint">simulate only</span>
+        <span class="toggle-track-ds" :class="{ checked: isDryRun }"><span class="toggle-thumb-ds"></span></span>
+        <span class="toggle-label-text">Dry Run (simulate)</span>
       </label>
     </div>
 
+    <!-- Progress Section -->
     <transition name="progress-fade">
-      <div v-if="progressVisible" class="progress-section" style="position: relative; z-index: 1;">
-        <div class="progress-header">
-          <span class="progress-label">
+      <div v-if="progressVisible" class="progress-section-ds">
+        <div class="progress-header-ds">
+          <span class="progress-label-ds">
             <i class="pi" :class="progressDone ? 'pi-check-circle' : 'pi-spin pi-spinner'"></i>
             {{ progressDone ? 'Done' : (progressLabel || 'Organizing...') }}
           </span>
-          <span class="stopwatch" :class="{ 'stopwatch-done': progressDone }">
+          <span class="stopwatch-ds" :class="{ 'stopwatch-done': progressDone }">
             <i class="pi pi-stopwatch"></i>
             {{ elapsedFormatted }}
           </span>
         </div>
-        <div class="progress-track">
+        <div class="progress-track-ds">
           <div
-              class="progress-fill"
+              class="progress-fill-ds"
               :class="{ 'progress-done': progressDone, 'progress-active': isProcessing }"
               :style="{ width: progressPct.toFixed(1) + '%' }"
           ></div>
@@ -383,31 +384,35 @@ const handleExecute = () => {
       </div>
     </transition>
 
-    <div class="button-group">
-      <button class="primary-btn" @click="handleExecute" :disabled="isProcessing">
+    <!-- Actions Row -->
+    <div class="actions-row-ds">
+      <button class="btn-ds cta full-width" @click="handleExecute" :disabled="isProcessing">
         <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-sort-alt'"></i>
-        {{ isProcessing ? 'Organizing...' : 'Start Organization' }}
+        <span>{{ isProcessing ? 'Organizing...' : 'Start Organizing' }}</span>
       </button>
       <button
           v-if="isProcessing"
-          class="secondary-btn cancel-btn"
+          class="btn-ds danger"
           @click="emit('cancel-operation')"
           :disabled="isCancelling"
       >
         <i class="pi" :class="isCancelling ? 'pi-spin pi-spinner' : 'pi-times-circle'"></i>
-        {{ isCancelling ? 'Cancelling...' : 'Cancel' }}
+        <span>{{ isCancelling ? 'Cancelling...' : 'Cancel' }}</span>
       </button>
     </div>
 
-    <button
-        class="secondary-btn"
-        @click="emit('undo')"
-        :disabled="isProcessing || !canUndo"
-        title="Move all files from the last real sort back to their original locations. Not available after dry runs."
-    >
-      <i class="pi pi-undo"></i>
-      Undo Last Sort
-    </button>
+    <!-- Undo Option -->
+    <div class="undo-row-ds" v-if="canUndo">
+      <button
+          class="btn-ds secondary full-width"
+          @click="emit('undo')"
+          :disabled="isProcessing"
+          title="Move all files from the last real sort back to their original locations."
+      >
+        <i class="pi pi-undo"></i>
+        <span>Undo Last Sort</span>
+      </button>
+    </div>
 
     <InfoModal v-if="showInfo" title="Model Organizer Info" @close="showInfo = false">
       <p>This tool scans massive <code>.safetensors</code> libraries using zero-memory byte parsing.</p><br>
@@ -421,150 +426,427 @@ const handleExecute = () => {
 </template>
 
 <style scoped>
-.icon-btn {
-  flex-shrink: 0;
-  display:     inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  background: var(--bg-input);
-  border: 1px solid var(--border-input);
-  border-radius: 8px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-
-.icon-btn:hover:not(:disabled) {
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
-  background: var(--bg-hover);
-}
-
-.icon-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.progress-section {
+.view-container-ds {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 0 2px;
+  gap: 18px;
+  max-width: 720px;
+  margin: 0 auto;
 }
 
-.progress-header {
+.view-header-ds {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.view-title-ds {
+  margin: 0;
+  font-size: var(--text-h2, 22px);
+  font-weight: var(--weight-extrabold, 800);
+  color: var(--color-text-primary);
+  letter-spacing: var(--tracking-tight);
+}
+
+.info-icon-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  transition: color var(--duration-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-icon-btn:hover {
+  color: var(--color-accent-primary);
+}
+
+.card-group-ds {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.card-header-ds {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.8rem;
 }
 
-.progress-label {
+.card-title-ds {
+  font-size: var(--text-body-sm, 13px);
+  font-weight: var(--weight-semibold, 600);
+  color: var(--color-text-primary);
+}
+
+.card-hint-ds {
+  font-size: var(--text-caption, 11px);
+  color: var(--color-text-tertiary);
+}
+
+.input-row-ds {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-ds {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--color-bg-canvas);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-size: var(--text-body-sm, 13px);
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color var(--duration-fast);
+}
+
+.input-ds.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-mono, 13px);
+}
+
+.input-ds:focus {
+  border-color: var(--color-accent-primary);
+  box-shadow: var(--glow-primary);
+}
+
+.btn-ds {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body-sm, 13px);
+  font-weight: var(--weight-semibold, 600);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+  border: 1px solid transparent;
+  outline: none;
+  white-space: nowrap;
+}
+
+.btn-ds.full-width {
+  width: 100%;
+}
+
+.btn-ds.cta {
+  background: var(--gradient-brand);
+  color: var(--color-text-on-accent);
+  border: none;
+  font-weight: var(--weight-bold);
+}
+
+.btn-ds.cta:hover:not(:disabled) {
+  opacity: 0.92;
+  box-shadow: var(--glow-primary);
+}
+
+.btn-ds.secondary {
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-subtle);
+}
+
+.btn-ds.secondary:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--glow-primary);
+}
+
+.btn-ds.danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border-color: rgba(242, 102, 91, 0.3);
+}
+
+.btn-ds.danger:hover:not(:disabled) {
+  box-shadow: var(--glow-danger);
+}
+
+.btn-ds.icon-only {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-subtle);
+}
+
+.btn-ds.icon-only:hover:not(:disabled) {
+  color: var(--color-accent-primary);
+  border-color: var(--color-accent-primary);
+}
+
+.btn-ds:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.badge-ds {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-caption, 11px);
+  font-weight: var(--weight-semibold);
+}
+
+.badge-ds.accent {
+  background: var(--color-accent-primary-bg);
+  color: var(--color-accent-primary);
+  border: 1px solid rgba(79, 216, 208, 0.25);
+}
+
+.arch-dropdown-ds {
+  position: relative;
+}
+
+.arch-trigger-ds {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  text-align: left;
+}
+
+.arch-chevron-icon {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  transition: transform var(--duration-fast);
+}
+
+.arch-chevron-icon.rotated {
+  transform: rotate(180deg);
+}
+
+.arch-panel-ds {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-strong);
+  overflow: hidden;
+}
+
+.arch-panel-header-ds {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.arch-search-ds {
+  padding: 6px 10px;
+  font-size: var(--text-body-sm, 13px);
+}
+
+.arch-bulk-ds {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-secondary);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: var(--text-caption, 11px);
+  color: var(--color-text-tertiary);
 }
 
-.progress-label .pi-check-circle {
-  color: var(--status-success);
+.btn-link-ds {
+  background: none;
+  border: none;
+  color: var(--color-accent-primary);
+  cursor: pointer;
+  font-size: var(--text-caption, 11px);
+  padding: 0;
 }
 
-.stopwatch {
+.btn-link-ds:disabled {
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.arch-list-ds {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.arch-item-ds {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: var(--text-body-sm, 13px);
+  color: var(--color-text-primary);
+  transition: background var(--duration-fast);
+}
+
+.arch-item-ds:hover {
+  background: var(--color-surface-3);
+}
+
+.arch-item-ds.selected {
+  color: var(--color-accent-primary);
+  font-weight: var(--weight-medium);
+}
+
+.arch-check-active {
+  color: var(--color-accent-primary);
+}
+
+.arch-check-inactive {
+  color: var(--color-text-disabled);
+}
+
+.arch-empty-ds {
+  padding: 12px;
+  font-size: var(--text-body-sm, 13px);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  text-align: center;
+}
+
+.arch-pills-ds {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.options-row-ds {
+  display: flex;
+  gap: 24px;
+  padding: 4px 0;
+}
+
+.toggle-control-ds {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-track-ds {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-default);
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.toggle-track-ds.checked {
+  background: var(--color-accent-primary);
+  border-color: var(--color-accent-primary);
+}
+
+.toggle-thumb-ds {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-text-secondary);
+  transition: transform var(--duration-fast) var(--ease-standard), background var(--duration-fast);
+}
+
+.toggle-track-ds.checked .toggle-thumb-ds {
+  transform: translateX(16px);
+  background: var(--color-text-on-accent);
+}
+
+.toggle-label-text {
+  font-size: var(--text-body-sm, 13px);
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-medium);
+}
+
+.progress-section-ds {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.progress-header-ds {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-body-sm, 13px);
+}
+
+.progress-label-ds {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-semibold);
+}
+
+.stopwatch-ds {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.85rem;
-  letter-spacing: 0.03em;
-  transition: color 0.3s;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--text-mono, 13px);
 }
 
 .stopwatch-done {
-  color: var(--status-success);
-  font-weight: 700;
+  color: var(--color-success);
+  font-weight: var(--weight-bold);
 }
 
-.progress-track {
+.progress-track-ds {
   width: 100%;
-  height: 5px;
-  background: var(--bg-input);
-  border-radius: 999px;
+  height: 6px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-full);
   overflow: hidden;
-  border: 1px solid var(--border-input);
+  border: 1px solid var(--color-border-subtle);
 }
 
-.progress-fill {
+.progress-fill-ds {
   height: 100%;
-  border-radius: 999px;
-  background: var(--grad-hover, linear-gradient(90deg, var(--accent-primary), var(--accent-secondary, var(--accent-primary))));
+  border-radius: var(--radius-full);
+  background: var(--gradient-brand);
   transition: width 0.3s ease-out;
-  position: relative;
-  overflow: hidden;
 }
 
-.progress-fill.progress-active::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.28) 50%,
-      transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
+.progress-fill-ds.progress-done {
+  background: var(--color-success);
 }
 
-.progress-fill.progress-done {
-  background: var(--status-success, #22c55e);
-  transition: width 0.25s ease-in, background 0.3s ease;
-}
-
-.progress-fill.progress-done::after {
-  display: none;
-}
-
-@keyframes shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-.progress-fade-enter-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-.progress-fade-leave-active {
-  transition: opacity 0.6s ease, transform 0.4s ease;
-}
-.progress-fade-enter-from,
-.progress-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
-
-.button-group {
+.actions-row-ds, .undo-row-ds {
   display: flex;
   gap: 12px;
-  align-items: stretch;
 }
-.button-group .primary-btn {
-  flex-grow: 1;
-}
-.cancel-btn {
-  border-color: var(--status-error-faded);
-  color: var(--status-error);
-}
-.cancel-btn:hover:not(:disabled) {
-  background: var(--status-error-faded);
-  border-color: var(--status-error);
-  color: #fff;
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 </style>
