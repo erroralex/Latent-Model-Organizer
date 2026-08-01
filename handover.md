@@ -54,9 +54,10 @@ Added sorting and Civitai metadata mapping for several new base models and archi
 
 ---
 
-## 4. Release 1.1.0
+## 4. Releases
 
-Cut and published the first release since v1.0.0, covering the Krea 2 and new base model support above.
+v1.1.0 was the first release since v1.0.0, covering the Krea 2 and new base model support above.
+v1.2.0 followed with the Forge user-metadata work.
 
 ### Process (source of truth for future releases)
 
@@ -94,6 +95,28 @@ Cut and published the first release since v1.0.0, covering the Krea 2 and new ba
 - Preview files now keep the extension the URL serves, so Civitai's `.mp4` animated previews
   stop being written as undecodable `.png` (section 7).
 - Shared IntelliJ run configurations under `.run/` (section 6).
+- Tagged as `v1.2.0` on the `main` merge commit (`46c287d`) — release build triggered
+  via GitHub Actions.
+
+**Verified against a real library after release:** the backfill was run over the reference
+Forge Neo install and filled the previously-empty models; the previously broken animated
+previews now render. Both features are confirmed working outside the test suite.
+
+### A trap when tagging
+
+`build.yml` reads the version from the pom **on the tagged commit**, so a tag placed on a
+`main` that has not yet received the version bump publishes a release whose name and artifacts
+disagree. This happened once: a PR was opened before the bump was pushed, so the merge brought
+in an older `development` and `main` still read `1.1.0`.
+
+Always confirm the version on the exact commit being tagged, not merely that `main` looks
+current:
+
+```bash
+git fetch origin
+git show origin/main:backend/pom.xml | grep -m1 "<version>"
+git log --oneline origin/main..origin/development   # must be empty
+```
 
 ---
 
@@ -198,3 +221,23 @@ where the URL suffix disagreed with the actual bytes in a way that broke renderi
 1715 preview files have content that does not match their extension, almost all `jpeg` bytes in
 `.preview.png` — the Civitai Helper extension names every preview `.preview.png` regardless of
 content. These render correctly because browsers sniff content type. Not worth renaming.
+
+---
+
+## 8. UI Redesign (Latent Design System Integration)
+
+The entire Vue 3 user interface has been reworked to conform to the unified **Latent Design System** (`https://github.com/erroralex/Latent-Design-System.git`). All changes were performed on the dedicated **`feature/ui-redesign-latent-ds`** branch.
+
+### Key Highlights
+
+- **Design System Token Suite:** Copied `styles.css` and token files (`colors.css`, `typography.css`, `spacing.css`, `effects.css`, `fonts.css`) into `frontend/src/assets/css/latent/`. Consolidated the app onto the single unified dark theme canvas (`#0A0A0D`), desaturated Latent Cyan (`#4FD8D0`) primary accent, and Latent Violet (`#9B7EF5`) secondary accent.
+- **Official App Mark & Assets:** Imported the official `latent-mark.svg` (cyan-to-violet gradient container with rounded L-glyph) and `latent-lockup.svg` from the upstream design system repo. The 52px frameless titlebar in `App.vue` now renders `latent-mark.svg`.
+- **Sidebar & Developer Attribution:** Updated `Sidebar.vue` to use standard `NavItem` styling with active tab highlights, a console toggle, and Alexander Nilsson's signature developer logo (`alx_logo.png`) linking to GitHub.
+- **View Refactoring:** `SorterView.vue` and `FetcherView.vue` refactored to use token cards, monospace inputs for folder paths, architecture badges, Deep Scan & Dry Run switches, and CTA buttons.
+- **Modals & Console:** `ConsoleWindow.vue`, `Settingsmodal.vue`, `Summarymodal.vue`, and `InfoModal.vue` restyled with tokenized dialog surfaces, desaturated backdrop scrims (`var(--color-surface-overlay)`), and JetBrains Mono monospace formatting.
+
+### Verification Status
+
+- **Frontend Build (`npm run build` in `frontend/`):** Passed with **BUILD SUCCESS** (zero compilation or CSS errors).
+- **Backend Unit Tests (`mvn test` in `backend/`):** Passed all **83 unit tests** (0 failures, BUILD SUCCESS).
+

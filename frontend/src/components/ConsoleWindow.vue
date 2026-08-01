@@ -2,18 +2,7 @@
 /**
  * ConsoleWindow.vue
  *
- * This component provides a real-time, terminal-like interface for monitoring backend activity.
- * It establishes a persistent Server-Sent Events (SSE) connection to the Java backend,
- * streaming SLF4J log entries directly to the UI.
- *
- * Key Capabilities:
- * - Dual-buffer Strategy: Uses a raw buffer + periodic flush to ensure smooth UI updates
- *   even during high-frequency log bursts.
- * - Semantic Highlighting: Automatically parses log levels (INFO, WARN, ERROR, DEBUG)
- *   and applies appropriate color coding.
- * - Rolling Window: Maintains a maximum of 1000 entries to prevent DOM bloat.
- * - Resilience: Automatic reconnection with exponential backoff for network stability.
- * - UX: Integrated auto-scroll locking and history clearing.
+ * Terminal drawer for streaming backend SLF4J logs aligned with the Latent Design System.
  */
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 
@@ -31,11 +20,11 @@ let logBuffer = [];
 let flushInterval = null;
 
 const LEVEL_COLORS = {
-  INFO: '#c9d1d9',
-  WARN: '#d29922',
-  ERROR: '#f85149',
-  DEBUG: '#8b949e',
-  TRACE: '#6e7681',
+  INFO: 'var(--color-text-primary)',
+  WARN: 'var(--color-warning)',
+  ERROR: 'var(--color-danger)',
+  DEBUG: 'var(--color-text-tertiary)',
+  TRACE: 'var(--color-text-disabled)',
 };
 
 const parseLogLine = (raw) => {
@@ -108,38 +97,38 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="console-root">
+  <div class="console-root-ds">
 
-    <div class="console-bar">
-      <div class="console-bar-left">
-        <i class="pi pi-terminal" style="color: var(--accent-primary); font-size: 0.85rem;"></i>
-        <span class="console-title">Backend Logs</span>
-        <span class="log-count" v-if="logs.length > 0">{{ logs.length }}</span>
+    <div class="console-bar-ds">
+      <div class="console-left-ds">
+        <i class="pi pi-terminal console-terminal-icon"></i>
+        <span class="console-title-ds">Backend Logs</span>
+        <span class="badge-ds outline" v-if="logs.length > 0">{{ logs.length }}</span>
       </div>
-      <div class="console-bar-right">
+      <div class="console-right-ds">
         <button
-            class="con-btn"
+            class="con-btn-ds"
             :class="{ active: isAutoScroll }"
             @click="toggleAutoScroll"
             title="Toggle auto-scroll"
         >
           <i class="pi pi-arrow-down"></i>
         </button>
-        <button class="con-btn" @click="clearLogs" title="Clear console">
+        <button class="con-btn-ds" @click="clearLogs" title="Clear console">
           <i class="pi pi-trash"></i>
         </button>
       </div>
     </div>
 
-    <div class="console-output custom-scrollbar" ref="consoleRef">
+    <div class="console-output-ds" ref="consoleRef">
       <div
           v-for="(log, i) in logs"
           :key="i"
-          class="log-line"
+          class="log-line-ds"
           :style="{ color: log.color }"
       >{{ log.text }}
       </div>
-      <div v-if="!logs.length" class="log-empty">
+      <div v-if="!logs.length" class="log-empty-ds">
         <i class="pi pi-spin pi-spinner"></i> Waiting for backend logs…
       </div>
     </div>
@@ -148,116 +137,109 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.console-root {
+.console-root-ds {
   display: flex;
   flex-direction: column;
-  background: #0d1117;
+  background: var(--color-bg-canvas);
   overflow: hidden;
 }
 
-.console-bar {
+.console-bar-ds {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  padding: 6px 14px;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--color-surface-1);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.console-bar-left {
+.console-left-ds {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.console-bar-right {
+.console-right-ds {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.console-title {
-  font-family: 'Consolas', 'Cascadia Code', monospace;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #6e7681;
+.console-terminal-icon {
+  color: var(--color-accent-primary);
+  font-size: 0.85rem;
+}
+
+.console-title-ds {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption, 11px);
+  font-weight: var(--weight-bold);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--tracking-caps);
 }
 
-.log-count {
-  font-size: 0.65rem;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #6e7681;
-  font-family: monospace;
-}
-
-.con-btn {
+.con-btn-ds {
   background: transparent;
   border: none;
   cursor: pointer;
-  color: #6e7681;
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
   line-height: 1;
-  transition: color 0.15s, background 0.15s;
+  transition: all var(--duration-fast);
 }
 
-.con-btn:hover {
-  color: #c9d1d9;
-  background: rgba(255, 255, 255, 0.08);
+.con-btn-ds:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-2);
 }
 
-.con-btn.active {
-  color: var(--accent-primary, #66fcf1);
+.con-btn-ds.active {
+  color: var(--color-accent-primary);
 }
 
-.console-output {
+.console-output-ds {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 8px 12px;
-  font-family: 'Consolas', 'Cascadia Code', 'Monaco', monospace;
-  font-size: 0.775rem;
-  line-height: 1.55;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono, 13px);
+  line-height: var(--text-mono-lh, 1.6);
 }
 
-.log-line {
+.log-line-ds {
   white-space: pre-wrap;
   word-break: break-all;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
 }
 
-.log-empty {
-  color: #3d4450;
+.log-empty-ds {
+  color: var(--color-text-disabled);
   text-align: center;
-  margin-top: 16px;
+  margin-top: 20px;
   font-style: italic;
-  font-size: 0.8rem;
+  font-size: var(--text-body-sm, 13px);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
 }
 
-.console-output::-webkit-scrollbar {
-  width: 6px;
+.badge-ds {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-caption, 11px);
 }
 
-.console-output::-webkit-scrollbar-track {
+.badge-ds.outline {
   background: transparent;
-}
-
-.console-output::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
-}
-
-.console-output::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+  color: var(--color-text-tertiary);
+  border: 1px solid var(--color-border-subtle);
 }
 </style>

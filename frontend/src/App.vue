@@ -2,17 +2,7 @@
 /**
  * App.vue
  *
- * The primary layout orchestration component for the Latent Model Organizer.
- * It manages global application state, including navigation, configuration,
- * and system-wide notifications.
- *
- * Key Capabilities:
- * - Dynamic View Switching: Manages navigation between Sorter and Fetcher modules.
- * - API Orchestration: Centralizes HTTP communication and handles ephemeral port discovery
- *   via Electron IPC for backend connectivity.
- * - State Persistence: Synchronizes user preferences and directory paths with LocalStorage.
- * - Integrated UI Shell: Controls the custom frame-less title bar, sidebar, and log console.
- * - Progress Tracking: Coordinates with child components to provide real-time operation status.
+ * Primary layout shell for Latent Model Organizer aligned with the Latent Design System.
  */
 import { ref, computed, onMounted, watch } from 'vue';
 import { useTheme } from './composables/useTheme';
@@ -22,6 +12,7 @@ import SettingsModal from './components/Settingsmodal.vue';
 import Sidebar from './components/Sidebar.vue';
 import SorterView from './views/SorterView.vue';
 import FetcherView from './views/FetcherView.vue';
+import latentMarkUrl from './assets/latent-mark.svg';
 
 const { currentTheme, availableThemes, applyTheme } = useTheme();
 
@@ -59,7 +50,7 @@ const canUndo           = ref(false);
 const lastTargetDirectory = ref(lsGet('lmo:lastTargetDir', ''));
 const isBackendReady    = ref(false);
 
-const apiBase = ref('http://localhost:8080'); // Dev fallback
+const apiBase = ref('http://localhost:8080');
 const apiToken = ref('');
 
 watch(isProcessing, (newValue) => {
@@ -197,14 +188,14 @@ const initializeBackendConnection = async () => {
 };
 
 onMounted(async () => {
-  applyTheme(currentTheme.value);
+  applyTheme();
   await initializeBackendConnection();
 });
 
 const statusClass = computed(() => {
-  if (statusMessage.value.startsWith('❌')) return 'is-error';
-  if (statusMessage.value.startsWith('⚠️')) return 'is-warn';
-  if (statusMessage.value.startsWith('✅')) return 'is-ok';
+  if (statusMessage.value.startsWith('❌')) return 'status-error';
+  if (statusMessage.value.startsWith('⚠️')) return 'status-warn';
+  if (statusMessage.value.startsWith('✅')) return 'status-ok';
   return '';
 });
 
@@ -215,51 +206,44 @@ const closeReport = () => {
 </script>
 
 <template>
-  <div class="layout-wrapper">
-    <header class="menubar-glass draggable-header">
-      <div class="hdr-logo">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" class="logo-icon no-drag">
-          <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                stroke-linejoin="round"/>
-          <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                stroke-linejoin="round"/>
-          <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                stroke-linejoin="round"/>
-        </svg>
-        <span class="app-name text-gradient">Latent Model Organizer</span>
+  <div class="layout-wrapper-ds">
+    <!-- Titlebar (52px frameless) -->
+    <header class="titlebar-ds">
+      <div class="brand-group-ds no-drag">
+        <img :src="latentMarkUrl" alt="Latent" class="brand-mark-img" />
+        <span class="app-title-ds">Latent Model Organizer</span>
       </div>
 
-      <div class="hdr-drag-region"></div>
+      <div class="titlebar-drag-region"></div>
 
-      <div class="hdr-controls">
-        <button class="nav-btn icon-only no-drag" @click="minimizeWindow" title="Minimize">
-          <i class="pi pi-minus"></i>
+      <div class="window-controls-ds no-drag">
+        <button class="win-btn-ds" @click="minimizeWindow" title="Minimize">
+          <span>–</span>
         </button>
-        <button class="nav-btn icon-only no-drag" @click="maximizeWindow" title="Maximize">
-          <i class="pi pi-window-maximize"></i>
+        <button class="win-btn-ds" @click="maximizeWindow" title="Maximize">
+          <span>▢</span>
         </button>
-        <button class="nav-btn icon-only window-close-btn no-drag" @click="closeWindow" title="Close">
-          <i class="pi pi-times"></i>
+        <button class="win-btn-ds danger" @click="closeWindow" title="Close">
+          <span>✕</span>
         </button>
       </div>
     </header>
 
-    <div class="app-body">
+    <div class="app-body-ds">
       <Sidebar
           :activeTab="activeTab"
           :showSettings="showSettings"
           :consoleOpen="consoleOpen"
           :isProcessing="isProcessing"
-          :currentTheme="currentTheme"
           @update:activeTab="v => activeTab = v"
           @update:showSettings="v => showSettings = v"
           @update:consoleOpen="v => consoleOpen = v"
       />
 
-      <main class="app-main">
-        <div class="content-scroll">
-          <div class="content-container">
-            <div class="glass-panel main-card">
+      <main class="app-main-ds">
+        <div class="content-scroll-ds">
+          <div class="content-container-ds">
+            <div class="card-ds main-card-ds">
               <div v-if="isBackendReady">
                 <SorterView
                     v-if="activeTab === 'sort'"
@@ -290,12 +274,14 @@ const closeReport = () => {
                     @cancel-operation="cancelOperation"
                 />
               </div>
-              <div v-else class="content-area glass-panel" style="display: flex; align-items: center; justify-content: center; height: 100%; min-height: 400px;">
-                <h2><i class="pi pi-spin pi-spinner" style="margin-right: 10px;"></i> Connecting to Engine...</h2>
+              <div v-else class="backend-connecting-ds">
+                <i class="pi pi-spin pi-spinner connecting-spin-icon"></i>
+                <span>Connecting to Engine...</span>
               </div>
             </div>
 
-            <div class="status-bar glass-panel" :class="statusClass">
+            <!-- Status Pill Bar -->
+            <div class="status-bar-ds" :class="statusClass">
               <i class="pi"
                  :class="{
                   'pi-check-circle':         statusMessage.startsWith('✅'),
@@ -305,13 +291,13 @@ const closeReport = () => {
                   'pi-spin pi-spinner':      isProcessing,
                 }"
               ></i>
-              {{ statusMessage }}
+              <span>{{ statusMessage }}</span>
             </div>
           </div>
         </div>
 
         <transition name="drawer">
-          <ConsoleWindow v-if="consoleOpen" :apiBase="apiBase" :apiToken="apiToken" class="console-drawer"/>
+          <ConsoleWindow v-if="consoleOpen" :apiBase="apiBase" :apiToken="apiToken" class="console-drawer-ds"/>
         </transition>
       </main>
     </div>
@@ -338,3 +324,192 @@ const closeReport = () => {
     />
   </div>
 </template>
+
+<style>
+/* App Layout Scoped / Global Rules for Latent Design System */
+body {
+  margin: 0;
+  background: var(--color-bg-canvas, #0A0A0D);
+  color: var(--color-text-primary, #F2F3F7);
+  font-family: var(--font-sans);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.layout-wrapper-ds {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Titlebar */
+.titlebar-ds {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px;
+  background: rgba(14, 15, 19, 0.8);
+  backdrop-filter: var(--blur-glass);
+  border-bottom: 1px solid var(--color-border-subtle);
+  user-select: none;
+  -webkit-app-region: drag;
+  z-index: 1000;
+}
+
+.brand-group-ds {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark-img {
+  width: 24px;
+  height: 24px;
+}
+
+.app-title-ds {
+  font-size: var(--text-body-lg, 16px);
+  font-weight: var(--weight-bold, 700);
+  background: var(--gradient-brand-text);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: var(--tracking-tight);
+}
+
+.titlebar-drag-region {
+  flex: 1;
+  height: 100%;
+}
+
+.window-controls-ds {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.win-btn-ds {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.win-btn-ds:hover {
+  background: var(--color-surface-1);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-subtle);
+}
+
+.win-btn-ds.danger:hover {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border-color: rgba(242, 102, 91, 0.3);
+}
+
+.app-body-ds {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.app-main-ds {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  position: relative;
+}
+
+.content-scroll-ds {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.content-container-ds {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 28px;
+}
+
+.card-ds {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.main-card-ds {
+  padding: 28px;
+  margin-bottom: 16px;
+}
+
+.backend-connecting-ds {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 360px;
+  font-size: var(--text-h3, 17px);
+  color: var(--color-text-secondary);
+}
+
+.connecting-spin-icon {
+  font-size: 1.5rem;
+  color: var(--color-accent-primary);
+}
+
+/* Status Bar */
+.status-bar-ds {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-subtle);
+  font-size: var(--text-body-sm, 13px);
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-medium);
+}
+
+.status-bar-ds.status-ok {
+  color: var(--color-success);
+  border-color: rgba(61, 214, 140, 0.2);
+  background: var(--color-success-bg);
+}
+
+.status-bar-ds.status-warn {
+  color: var(--color-warning);
+  border-color: rgba(245, 184, 78, 0.2);
+  background: var(--color-warning-bg);
+}
+
+.status-bar-ds.status-error {
+  color: var(--color-danger);
+  border-color: rgba(242, 102, 91, 0.2);
+  background: var(--color-danger-bg);
+}
+
+.console-drawer-ds {
+  flex-shrink: 0;
+  height: 220px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+</style>
