@@ -302,6 +302,16 @@ screenshot comparison against Latent Library:
   matching the pattern the Ko-fi link already used. (Latent Library doesn't have this
   bug — its `electron/main.js` has a global `setWindowOpenHandler` that intercepts all
   external links app-wide, not just ones explicitly wired through IPC.)
+  - **Follow-up**: that first fix put the `window.electronAPI?.openExternal(...)` call
+    inline in the template expression, and the link stopped opening anything at all.
+    No codebase precedent existed for a bare `window.` reference inside a Vue template
+    (every other external-link call, e.g. `Settingsmodal.vue`'s `openKofi`, is a
+    script-level function), so rather than debug Vue's `with`-block global-fallback
+    resolution for `window` inside compiled render functions, moved the logic into a
+    proper `openDevProfile()` function in `Sidebar.vue`'s `<script setup>` — matching
+    the established pattern exactly, including `openKofi`'s `window.open(url, '_blank')`
+    fallback for when `electronAPI` isn't present (e.g. running `npm run dev` in a
+    plain browser instead of the packaged Electron shell).
 - **Dev-credit logo size**: initially left as-is here (`width: 64px`) since Latent
   Library's `.dev-logo-img` was brought down to match it. The user then said the
   64px version read as too tiny and preferred Library's original

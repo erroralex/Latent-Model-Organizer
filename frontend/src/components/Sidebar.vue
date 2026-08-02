@@ -15,6 +15,15 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:consoleOpen']);
+
+const openDevProfile = () => {
+  const url = 'https://github.com/erroralex';
+  if (window.electronAPI?.openExternal) {
+    window.electronAPI.openExternal(url);
+  } else {
+    window.open(url, '_blank');
+  }
+};
 </script>
 
 <template>
@@ -75,7 +84,7 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
           rel="noopener noreferrer"
           title="Built by Alexander Nilsson"
           class="dev-credit-link"
-          @click.prevent="window.electronAPI?.openExternal('https://github.com/erroralex')"
+          @click.prevent="openDevProfile"
         >
           <img :src="alxLogoUrl" alt="Alexander Nilsson" class="dev-logo-img" />
         </a>
