@@ -15,10 +15,12 @@
  *   cross-platform folder exploration via shell.openPath, external URL handling,
  *   dynamic backend port retrieval, and proxied undo operations.
  * - windowAPI: Provides a clean interface for controlling the application window state
- *   (minimize, maximize, close) from the custom glassmorphic title bar.
+ *   (minimize, maximize, close) from the custom glassmorphic title bar, plus the
+ *   renderer's Chromium zoom factor for Ctrl+Scroll app-scale zooming (webFrame runs
+ *   directly in the preload context, no IPC needed).
  */
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
     selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
@@ -33,4 +35,6 @@ contextBridge.exposeInMainWorld('windowAPI', {
     minimize: () => ipcRenderer.send('window:minimize'),
     maximize: () => ipcRenderer.send('window:maximize'),
     close: () => ipcRenderer.send('app:quit'),
+    getZoomFactor: () => webFrame.getZoomFactor(),
+    setZoomFactor: (factor) => webFrame.setZoomFactor(factor),
 });
