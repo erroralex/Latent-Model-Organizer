@@ -13,6 +13,7 @@ import Sidebar from './components/Sidebar.vue';
 import SorterView from './views/SorterView.vue';
 import FetcherView from './views/FetcherView.vue';
 import latentMarkUrl from './assets/latent-mark.svg';
+import { Loader2, CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-vue-next';
 
 const { currentTheme, availableThemes, applyTheme } = useTheme();
 
@@ -203,6 +204,14 @@ const closeReport = () => {
   showReportModal.value = false;
   operationReport.value = null;
 };
+
+const statusIcon = computed(() => {
+  if (isProcessing.value) return Loader2;
+  if (statusMessage.value.startsWith('✅')) return CheckCircle2;
+  if (statusMessage.value.startsWith('⚠️')) return AlertTriangle;
+  if (statusMessage.value.startsWith('❌')) return XCircle;
+  return Info;
+});
 </script>
 
 <template>
@@ -275,22 +284,18 @@ const closeReport = () => {
                 />
               </div>
               <div v-else class="backend-connecting-ds">
-                <i class="pi pi-spin pi-spinner connecting-spin-icon"></i>
+                <Loader2 :size="24" class="spin-icon connecting-spin-icon" />
                 <span>Connecting to Engine...</span>
               </div>
             </div>
 
             <!-- Status Pill Bar -->
             <div class="status-bar-ds" :class="statusClass">
-              <i class="pi"
-                 :class="{
-                  'pi-check-circle':         statusMessage.startsWith('✅'),
-                  'pi-exclamation-triangle': statusMessage.startsWith('⚠️'),
-                  'pi-times-circle':         statusMessage.startsWith('❌'),
-                  'pi-info-circle':          statusMessage === 'Ready.',
-                  'pi-spin pi-spinner':      isProcessing,
-                }"
-              ></i>
+              <component
+                  :is="statusIcon"
+                  :size="16"
+                  :class="{ 'spin-icon': isProcessing }"
+              />
               <span>{{ statusMessage }}</span>
             </div>
           </div>

@@ -6,6 +6,7 @@
  */
 import { ref, watch } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
+import { HelpCircle, FolderOpen, Info, CloudDownload, XCircle, Tags, Loader2 } from 'lucide-vue-next';
 
 const props = defineProps({
   isProcessing: { type: Boolean, default: false },
@@ -44,7 +45,7 @@ const handleBackfill = () => {
     <div class="view-header-ds">
       <h1 class="view-title-ds">Fetcher</h1>
       <button class="info-icon-btn" @click="showInfo = true" title="What is this?">
-        <i class="pi pi-question-circle"></i>
+        <HelpCircle :size="16" />
       </button>
     </div>
 
@@ -57,7 +58,7 @@ const handleBackfill = () => {
       <div class="input-row-ds">
         <input class="input-ds mono" type="text" readonly :value="targetFolder" placeholder="Select folder to scan…" />
         <button class="btn-ds secondary" @click="pickTarget" :disabled="isProcessing">
-          <i class="pi pi-folder-open"></i> Browse
+          <FolderOpen :size="16" /> Browse
         </button>
       </div>
       <p class="card-helper-ds">Recursively scans for models missing Civitai metadata and preview images.</p>
@@ -65,7 +66,7 @@ const handleBackfill = () => {
 
     <!-- Info Banner -->
     <div class="info-banner-ds">
-      <i class="pi pi-info-circle info-banner-icon"></i>
+      <Info :size="18" class="info-banner-icon" />
       <div class="info-banner-text">
         <p>Calculates SHA-256 hashes for all models without a <code>.civitai.info</code> sidecar, queries the Civitai API, and downloads metadata + preview images in-place.</p>
         <p><strong>No files will be moved.</strong></p>
@@ -89,7 +90,7 @@ const handleBackfill = () => {
     <!-- Main Actions -->
     <div class="actions-row-ds">
       <button class="btn-ds cta full-width" @click="handleExecute" :disabled="isProcessing">
-        <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-cloud-download'"></i>
+        <component :is="isProcessing ? Loader2 : CloudDownload" :size="16" :class="{ 'spin-icon': isProcessing }" />
         <span>{{ isProcessing ? 'Fetching…' : 'Start Fetching Metadata' }}</span>
       </button>
       <button
@@ -98,7 +99,7 @@ const handleBackfill = () => {
           @click="emit('cancel-operation')"
           :disabled="isCancelling"
       >
-        <i class="pi" :class="isCancelling ? 'pi-spin pi-spinner' : 'pi-times-circle'"></i>
+        <component :is="isCancelling ? Loader2 : XCircle" :size="16" :class="{ 'spin-icon': isCancelling }" />
         <span>{{ isCancelling ? 'Cancelling...' : 'Cancel' }}</span>
       </button>
     </div>
@@ -114,7 +115,7 @@ const handleBackfill = () => {
         This writes trigger words and descriptions from existing sidecars into that file for the LoRA card's <strong>Activation text</strong> and <strong>Description</strong> boxes. Fast, offline, and preserves custom edits.
       </p>
       <button class="btn-ds secondary full-width" @click="handleBackfill" :disabled="isProcessing">
-        <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-tags'"></i>
+        <component :is="isProcessing ? Loader2 : Tags" :size="16" :class="{ 'spin-icon': isProcessing }" />
         <span>Backfill Trigger Words &amp; Descriptions</span>
       </button>
     </div>

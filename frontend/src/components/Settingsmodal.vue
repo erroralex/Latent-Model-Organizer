@@ -5,6 +5,7 @@
  * Settings dialog for Latent Model Organizer aligned with the Latent Design System.
  */
 import { ref, onMounted } from 'vue';
+import { Settings as SettingsIcon, Palette, SlidersHorizontal, Heart } from 'lucide-vue-next';
 
 const props = defineProps({
   currentTheme: { type: String, required: true },
@@ -43,7 +44,7 @@ onMounted(async () => {
 
       <div class="modal-header-ds">
         <div class="modal-title-group-ds">
-          <i class="pi pi-cog modal-header-icon-ds"></i>
+          <SettingsIcon :size="18" class="modal-header-icon-ds" />
           <h2 class="modal-title-ds">Settings</h2>
         </div>
         <button class="win-btn-ds" @click="emit('close')" title="Close">
@@ -56,7 +57,7 @@ onMounted(async () => {
         <!-- Theme Info -->
         <section class="modal-section-ds">
           <h3 class="modal-section-title-ds">
-            <i class="pi pi-palette"></i> Appearance
+            <Palette :size="14" /> Appearance
           </h3>
           <div class="theme-info-box-ds">
             <div class="swatch-ds"></div>
@@ -71,7 +72,7 @@ onMounted(async () => {
         <!-- Default Toggles -->
         <section class="modal-section-ds">
           <h3 class="modal-section-title-ds">
-            <i class="pi pi-sliders-h"></i> Default Toggles
+            <SlidersHorizontal :size="14" /> Default Toggles
           </h3>
           <div class="toggle-list-ds">
             <div class="toggle-row-ds">
@@ -102,7 +103,7 @@ onMounted(async () => {
         <!-- Support Section -->
         <section class="modal-section-ds">
           <h3 class="modal-section-title-ds">
-            <i class="pi pi-heart"></i> Support
+            <Heart :size="14" /> Support
           </h3>
           <button class="kofi-btn-ds" @click="openKofi">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">

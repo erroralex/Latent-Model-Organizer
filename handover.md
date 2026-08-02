@@ -241,3 +241,70 @@ The entire Vue 3 user interface has been reworked to conform to the unified **La
 - **Frontend Build (`npm run build` in `frontend/`):** Passed with **BUILD SUCCESS** (zero compilation or CSS errors).
 - **Backend Unit Tests (`mvn test` in `backend/`):** Passed all **83 unit tests** (0 failures, BUILD SUCCESS).
 
+---
+
+## 9. Icon System Standardization: PrimeIcons → Lucide
+
+This app was the reference standard for a cross-app pass bringing Latent Library and Latent
+Tools' chrome (sidebar, titlebar, icons) in line with it — the sidebar/titlebar here were
+already correct and untouched. What changed here was the icon system itself: this app used
+PrimeIcons (`pi pi-*`) exclusively, while Latent Library's main nav already used
+`lucide-vue-next`. Standardized all three apps on Lucide.
+
+- **`package.json`**: removed `primeicons`, added `"lucide-vue-next": "^1.0.0"` (matched to
+  the version pinned in Latent Library's `frontend/package.json` for consistency). Note: npm
+  flags `lucide-vue-next@1.0.0` as deprecated in favor of `@lucide/vue`, but the exact version
+  was kept to match the sibling app.
+- **9 files migrated**: `main.js` (dropped the `primeicons/primeicons.css` import),
+  `App.vue`, `components/ConsoleWindow.vue`, `components/InfoModal.vue`,
+  `components/Settingsmodal.vue`, `components/Sidebar.vue`, `components/Summarymodal.vue`,
+  `views/FetcherView.vue`, `views/SorterView.vue`. All icons here are rendered as plain
+  `<i class="pi ...">` elements (no PrimeVue Menu/TieredMenu icon-slot usage exists in this
+  codebase), so every conversion was a direct template swap to `<IconName :size="16" />` or
+  `<component :is="...">` for conditionally-chosen icons — no slot-plumbing needed, unlike
+  Library's PrimeVue `<Button icon="...">`/`<Tree>` cases.
+- Added a `.spin-icon` utility + `@keyframes spin` in `assets/css/components/base.css` for
+  the `Loader2` replacements of `pi-spin pi-spinner` (no spin animation existed previously).
+- `App.vue`'s status-bar icon previously combined multiple PrimeIcons classes
+  (`pi-check-circle`/`pi-exclamation-triangle`/`pi-times-circle`/`pi-info-circle`/
+  `pi-spin pi-spinner`) that could theoretically co-occur; replaced with a `statusIcon`
+  computed with an explicit priority order (processing spinner > success > warning > error >
+  default info) — a judgment call since the original classes had no documented precedence.
+- A handful of icons had no listed mapping and were chosen by best semantic match:
+  `pi-terminal`→`Terminal`, `pi-question-circle`→`HelpCircle`, `pi-chart-bar`→`BarChart3`,
+  `pi-inbox`→`Inbox`, `pi-check-square`/`pi-stop`→`CheckSquare`/`Square`,
+  `pi-stopwatch`→`Timer`, `pi-undo`→`Undo2`.
+- **Verification**: `grep -rn "pi pi-\|primeicons\|pi-spin" frontend/src` returns zero
+  results; `npm run build` succeeded (1764 modules, no errors). `lucide-vue-next` was
+  installed with `--no-save`-equivalent scope limited to itself (not a full reinstall) purely
+  to prove the build resolves the new import; `package-lock.json` reflects that one install.
+  `primeicons` has not yet been removed from `node_modules` via a full `npm install` —
+  `package.json` is the source of truth, a normal install will reconcile the lockfile.
+
+---
+
+## 10. Post-Migration Fixes (found via user screenshots)
+
+Follow-up pass, same session as section 9 — two issues surfaced from a live
+screenshot comparison against Latent Library:
+
+- **Dev-credit logo opened in the wrong browser**: `components/Sidebar.vue`'s
+  GitHub-profile link was a plain `<a href="..." target="_blank">`. This app's
+  `electron/main.js` has an IPC `shell:openExternal` handler
+  (`ipcMain.on('shell:openExternal', ...)` → `shell.openExternal`, already used
+  correctly by `Settingsmodal.vue`'s Ko-fi link via
+  `window.electronAPI.openExternal(...)`) but **no `setWindowOpenHandler`** override
+  on the `BrowserWindow`'s `webContents`. Without that, Electron's default handling of
+  `target="_blank"` anchors opened the link in a bare, unbranded Chromium window
+  instead of the system default browser — reads as "the wrong browser" to a user.
+  Fixed by removing `target="_blank"` and routing the click through
+  `window.electronAPI.openExternal('https://github.com/erroralex')` on `@click.prevent`,
+  matching the pattern the Ko-fi link already used. (Latent Library doesn't have this
+  bug — its `electron/main.js` has a global `setWindowOpenHandler` that intercepts all
+  external links app-wide, not just ones explicitly wired through IPC.)
+- **Dev-credit logo size**: already correct here (`width: 64px`) — this was the
+  reference value Latent Library's `.dev-logo-img` (previously `max-width: 120px;
+  max-height: 44px`) was brought into alignment with. No change needed in this repo.
+
+**Verification**: `cd frontend && npm run build` clean.
+

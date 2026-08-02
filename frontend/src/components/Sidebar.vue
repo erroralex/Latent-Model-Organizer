@@ -5,6 +5,7 @@
  * Navigation sidebar for Latent Model Organizer aligned with the Latent Design System.
  */
 import alxLogoUrl from '../assets/alx_logo.png';
+import { ArrowUpDown, CloudDownload, Settings as SettingsIcon } from 'lucide-vue-next';
 
 const props = defineProps({
   activeTab: { type: String, required: true },
@@ -27,7 +28,7 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
           :disabled="isProcessing"
         >
           <span class="active-indicator-bar" v-if="activeTab === 'sort'"></span>
-          <i class="pi pi-sort-alt nav-icon"></i>
+          <ArrowUpDown :size="17" class="nav-icon" />
           <span>Sorter</span>
         </button>
 
@@ -38,7 +39,7 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
           :disabled="isProcessing"
         >
           <span class="active-indicator-bar" v-if="activeTab === 'fetch'"></span>
-          <i class="pi pi-cloud-download nav-icon"></i>
+          <CloudDownload :size="17" class="nav-icon" />
           <span>Fetcher</span>
         </button>
       </div>
@@ -65,16 +66,16 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
           @click="emit('update:showSettings', !showSettings)"
         >
           <span class="active-indicator-bar" v-if="showSettings"></span>
-          <i class="pi pi-cog nav-icon"></i>
+          <SettingsIcon :size="17" class="nav-icon" />
           <span>Settings</span>
         </button>
 
         <a
           href="https://github.com/erroralex"
-          target="_blank"
           rel="noopener noreferrer"
           title="Built by Alexander Nilsson"
           class="dev-credit-link"
+          @click.prevent="window.electronAPI?.openExternal('https://github.com/erroralex')"
         >
           <img :src="alxLogoUrl" alt="Alexander Nilsson" class="dev-logo-img" />
         </a>

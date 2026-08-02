@@ -5,6 +5,7 @@
  * Terminal drawer for streaming backend SLF4J logs aligned with the Latent Design System.
  */
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { Terminal, ArrowDown, Trash2, Loader2 } from 'lucide-vue-next';
 
 const props = defineProps({
   apiBase: { type: String, required: true },
@@ -101,7 +102,7 @@ onUnmounted(() => {
 
     <div class="console-bar-ds">
       <div class="console-left-ds">
-        <i class="pi pi-terminal console-terminal-icon"></i>
+        <Terminal :size="14" class="console-terminal-icon" />
         <span class="console-title-ds">Backend Logs</span>
         <span class="badge-ds outline" v-if="logs.length > 0">{{ logs.length }}</span>
       </div>
@@ -112,10 +113,10 @@ onUnmounted(() => {
             @click="toggleAutoScroll"
             title="Toggle auto-scroll"
         >
-          <i class="pi pi-arrow-down"></i>
+          <ArrowDown :size="14" />
         </button>
         <button class="con-btn-ds" @click="clearLogs" title="Clear console">
-          <i class="pi pi-trash"></i>
+          <Trash2 :size="14" />
         </button>
       </div>
     </div>
@@ -129,7 +130,7 @@ onUnmounted(() => {
       >{{ log.text }}
       </div>
       <div v-if="!logs.length" class="log-empty-ds">
-        <i class="pi pi-spin pi-spinner"></i> Waiting for backend logs…
+        <Loader2 :size="14" class="spin-icon" /> Waiting for backend logs…
       </div>
     </div>
 

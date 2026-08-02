@@ -5,6 +5,7 @@
  * Summary reporting dialog for Latent Model Organizer aligned with the Latent Design System.
  */
 import { computed } from 'vue';
+import { Eye, CheckCircle2, BarChart3, Inbox, AlertTriangle, XCircle, X } from 'lucide-vue-next';
 
 const props = defineProps({
   report: { type: Object, required: true },
@@ -31,8 +32,8 @@ const fmtNum = (n) => (n ?? 0).toLocaleString();
 
       <div class="modal-header-ds">
         <div class="modal-title-group-ds">
-          <i class="pi" :class="isDryRun ? 'pi-eye' : 'pi-check-circle'"
-             :style="{ color: isDryRun ? 'var(--color-warning)' : 'var(--color-success)' }"></i>
+          <component :is="isDryRun ? Eye : CheckCircle2" :size="18"
+             :style="{ color: isDryRun ? 'var(--color-warning)' : 'var(--color-success)' }" />
           <h2 class="modal-title-ds">{{ title }}</h2>
           <span v-if="isDryRun" class="badge-ds warning">DRY RUN</span>
         </div>
@@ -60,7 +61,7 @@ const fmtNum = (n) => (n ?? 0).toLocaleString();
 
         <div v-if="sortedSummary.length > 0" class="modal-section-ds">
           <h3 class="modal-section-title-ds">
-            <i class="pi pi-chart-bar"></i> Breakdown by Architecture
+            <BarChart3 :size="14" /> Breakdown by Architecture
           </h3>
           <ul class="summary-list-ds">
             <li v-for="[arch, count] in sortedSummary" :key="arch" class="summary-row-ds">
@@ -74,17 +75,17 @@ const fmtNum = (n) => (n ?? 0).toLocaleString();
           </ul>
         </div>
         <div v-else class="empty-state-ds">
-          <i class="pi pi-inbox"></i>
+          <Inbox :size="20" />
           <p>No items were categorized.</p>
         </div>
 
         <div v-if="hasErrors" class="modal-section-ds error-section-ds">
           <h3 class="modal-section-title-ds error-title-ds">
-            <i class="pi pi-exclamation-triangle"></i> Errors ({{ errorCount }})
+            <AlertTriangle :size="14" /> Errors ({{ errorCount }})
           </h3>
           <ul class="error-list-ds">
             <li v-for="(err, i) in report.errors" :key="i" class="error-item-ds">
-              <i class="pi pi-times-circle error-dot-ds"></i>{{ err }}
+              <XCircle :size="14" class="error-dot-ds" />{{ err }}
             </li>
           </ul>
         </div>
@@ -93,7 +94,7 @@ const fmtNum = (n) => (n ?? 0).toLocaleString();
 
       <div class="modal-footer-ds">
         <button class="btn-ds secondary" @click="emit('close')">
-          <i class="pi pi-times"></i> Close
+          <X :size="16" /> Close
         </button>
       </div>
 

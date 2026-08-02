@@ -6,6 +6,10 @@
  */
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
+import {
+  HelpCircle, FolderOpen, ExternalLink, ChevronDown, CheckSquare, Square,
+  CheckCircle2, Loader2, Timer, ArrowUpDown, XCircle, Undo2,
+} from 'lucide-vue-next';
 
 const props = defineProps({
   isProcessing: { type: Boolean, default: false },
@@ -241,7 +245,7 @@ const handleExecute = () => {
     <div class="view-header-ds">
       <h1 class="view-title-ds">Sorter</h1>
       <button class="info-icon-btn" @click="showInfo = true" title="What is this?">
-        <i class="pi pi-question-circle"></i>
+        <HelpCircle :size="16" />
       </button>
     </div>
 
@@ -254,7 +258,7 @@ const handleExecute = () => {
       <div class="input-row-ds">
         <input class="input-ds mono" type="text" readonly :value="sourceFolder" placeholder="Select source folder..."/>
         <button class="btn-ds secondary" @click="pickSource" :disabled="isProcessing">
-          <i class="pi pi-folder-open"></i> Browse
+          <FolderOpen :size="16" /> Browse
         </button>
         <button
             class="btn-ds icon-only"
@@ -262,7 +266,7 @@ const handleExecute = () => {
             :disabled="!sourceFolder || isProcessing"
             title="Open folder in Explorer"
         >
-          <i class="pi pi-external-link"></i>
+          <ExternalLink :size="16" />
         </button>
       </div>
     </div>
@@ -276,7 +280,7 @@ const handleExecute = () => {
       <div class="input-row-ds">
         <input class="input-ds mono" type="text" readonly :value="targetFolder" placeholder="Select target folder..."/>
         <button class="btn-ds secondary" @click="pickTarget" :disabled="isProcessing">
-          <i class="pi pi-folder-open"></i> Browse
+          <FolderOpen :size="16" /> Browse
         </button>
         <button
             class="btn-ds icon-only"
@@ -284,7 +288,7 @@ const handleExecute = () => {
             :disabled="!targetFolder || isProcessing"
             title="Open folder in Explorer"
         >
-          <i class="pi pi-external-link"></i>
+          <ExternalLink :size="16" />
         </button>
       </div>
     </div>
@@ -310,7 +314,7 @@ const handleExecute = () => {
           <span class="badge-ds accent" v-if="!allSelected && !noneSelected">
             {{ selectedArchitectures.length }}
           </span>
-          <i class="pi pi-chevron-down arch-chevron-icon" :class="{ rotated: dropdownOpen }"></i>
+          <ChevronDown :size="12" class="arch-chevron-icon" :class="{ rotated: dropdownOpen }" />
         </button>
         <Teleport to="body">
           <div v-if="dropdownOpen" class="arch-panel-ds" :style="teleportStyle">
@@ -330,7 +334,8 @@ const handleExecute = () => {
                   :class="{ selected: isSelected(arch) }"
                   @click="toggleArch(arch)"
               >
-                <i class="pi" :class="isSelected(arch) ? 'pi-check-square arch-check-active' : 'pi-stop arch-check-inactive'"></i>
+                <component :is="isSelected(arch) ? CheckSquare : Square" :size="14"
+                           :class="isSelected(arch) ? 'arch-check-active' : 'arch-check-inactive'" />
                 <span>{{ arch }}</span>
               </li>
               <li v-if="!filteredArchs.length" class="arch-empty-ds">No matches for "{{ archSearch }}"</li>
@@ -366,11 +371,11 @@ const handleExecute = () => {
       <div v-if="progressVisible" class="progress-section-ds">
         <div class="progress-header-ds">
           <span class="progress-label-ds">
-            <i class="pi" :class="progressDone ? 'pi-check-circle' : 'pi-spin pi-spinner'"></i>
+            <component :is="progressDone ? CheckCircle2 : Loader2" :size="14" :class="{ 'spin-icon': !progressDone }" />
             {{ progressDone ? 'Done' : (progressLabel || 'Organizing...') }}
           </span>
           <span class="stopwatch-ds" :class="{ 'stopwatch-done': progressDone }">
-            <i class="pi pi-stopwatch"></i>
+            <Timer :size="14" />
             {{ elapsedFormatted }}
           </span>
         </div>
@@ -387,7 +392,7 @@ const handleExecute = () => {
     <!-- Actions Row -->
     <div class="actions-row-ds">
       <button class="btn-ds cta full-width" @click="handleExecute" :disabled="isProcessing">
-        <i class="pi" :class="isProcessing ? 'pi-spin pi-spinner' : 'pi-sort-alt'"></i>
+        <component :is="isProcessing ? Loader2 : ArrowUpDown" :size="16" :class="{ 'spin-icon': isProcessing }" />
         <span>{{ isProcessing ? 'Organizing...' : 'Start Organizing' }}</span>
       </button>
       <button
@@ -396,7 +401,7 @@ const handleExecute = () => {
           @click="emit('cancel-operation')"
           :disabled="isCancelling"
       >
-        <i class="pi" :class="isCancelling ? 'pi-spin pi-spinner' : 'pi-times-circle'"></i>
+        <component :is="isCancelling ? Loader2 : XCircle" :size="16" :class="{ 'spin-icon': isCancelling }" />
         <span>{{ isCancelling ? 'Cancelling...' : 'Cancel' }}</span>
       </button>
     </div>
@@ -409,7 +414,7 @@ const handleExecute = () => {
           :disabled="isProcessing"
           title="Move all files from the last real sort back to their original locations."
       >
-        <i class="pi pi-undo"></i>
+        <Undo2 :size="16" />
         <span>Undo Last Sort</span>
       </button>
     </div>

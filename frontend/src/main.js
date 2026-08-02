@@ -11,8 +11,6 @@ import './assets/css/components/layout.css'
 import './assets/css/components/buttons.css'
 import './assets/css/components/primevue-overrides.css'
 
-import 'primeicons/primeicons.css'
-
 import { createApp } from 'vue'
 import PrimeVue from 'primevue/config'
 import App from './App.vue'

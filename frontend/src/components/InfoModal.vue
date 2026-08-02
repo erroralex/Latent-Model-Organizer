@@ -4,6 +4,8 @@
  *
  * Info dialog component for Latent Model Organizer aligned with the Latent Design System.
  */
+import { HelpCircle, Check } from 'lucide-vue-next';
+
 defineProps({
   title: { type: String, required: true },
 });
@@ -16,7 +18,7 @@ const emit = defineEmits(['close']);
 
       <div class="modal-header-ds">
         <div class="modal-title-group-ds">
-          <i class="pi pi-question-circle modal-icon-ds"></i>
+          <HelpCircle :size="18" class="modal-icon-ds" />
           <h2 class="modal-title-ds">{{ title }}</h2>
         </div>
         <button class="win-btn-ds" @click="emit('close')" title="Close">
@@ -30,7 +32,7 @@ const emit = defineEmits(['close']);
 
       <div class="modal-footer-ds">
         <button class="btn-ds secondary" @click="emit('close')">
-          <i class="pi pi-check"></i> Got it
+          <Check :size="16" /> Got it
         </button>
       </div>
 
