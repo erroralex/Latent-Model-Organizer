@@ -361,3 +361,36 @@ window controls) were left untouched.
 
 **Verification**: `cd frontend && npm run build` clean.
 
+---
+
+## 13. License/Docs/Packaging Coherence Pass (Latent Library as reference)
+
+Auditing README/BUILDING/CONTRIBUTING/LICENSE against Latent Library (the reference
+app for this pass) turned up drift that predates this session:
+
+- **`backend/pom.xml`** had none of `<url>`/`<licenses>`/`<developers>`/`<scm>` —
+  Library got this metadata filled in during an earlier audit (see Library's
+  HANDOVER §10) but Organizer never received the same pass. Added the identical
+  block (license name `MIT License with Commons Clause`, developer `Alexander
+  Nilsson`, `scm`/`url` pointing at this repo).
+- **`electron/package.json`** had `"license": "ISC"` (a Spring-Initializr-style
+  default that was never actually correct — this project has no ISC-licensed code)
+  and `"author": "Latent Model Organizer"` (the product name, not a person). Fixed
+  to `"SEE LICENSE IN LICENSE"` and `"Alexander Nilsson"`, matching Library's
+  `electron/package.json` exactly.
+- **`frontend/package.json`** was missing a `license` field entirely; added
+  `"SEE LICENSE IN LICENSE"` to match Library's.
+- **`BUILDING.md`** documented the Windows build as `Latent Model Organizer Setup
+  X.X.X.exe`, implying an NSIS installer — but `electron/package.json`'s
+  `win.target` here is `"portable"`, same as Library. This is the exact bug Library
+  had and fixed in its own docs pass; ported the fix here too:
+  `Latent Model Organizer X.X.X.exe (portable, no installer)`.
+- **`CONTRIBUTING.md`** didn't reference `AGENTS.md` even though the file exists in
+  this repo; added the same pointer sentence Library's `CONTRIBUTING.md` has.
+- **Not touched deliberately**: Organizer's backend has no Maven wrapper (`mvnw`),
+  unlike Library, so `CONTRIBUTING.md`'s "run `mvn clean install`" (not `./mvnw`)
+  instruction is accurate as-is — a genuine tooling difference, not doc drift.
+
+**Verification**: `cd frontend && npm run build` clean; `pom.xml` confirmed
+well-formed XML; `package.json` files confirmed valid JSON.
+
