@@ -394,3 +394,75 @@ app for this pass) turned up drift that predates this session:
 **Verification**: `cd frontend && npm run build` clean; `pom.xml` confirmed
 well-formed XML; `package.json` files confirmed valid JSON.
 
+---
+
+## 14. Illustrious/NoobAI/Pony Misclassified as "SDXL 1.0" During Sort
+
+The user ran a real sort over a Forge Neo Lora library and found LoRAs with names like
+`illustriousXL_stabilizer_v1.23` and `noobaiXLNAIXL_epsilonPred11Version-lora` landing in
+`SDXL 1.0` instead of `Illustrious`/`NoobAI`.
+
+### Root cause
+
+`ModelAnalyzer.analyze()` checks the safetensors internal header before filename
+heuristics, and returns immediately once the header resolves to anything other than
+`"Unknown"` — filename heuristics were only ever consulted for one narrow override (Z
+Image variants). Illustrious, NoobAI, and Pony are all SDXL fine-tunes, and kohya_ss (the
+tool that trains the overwhelming majority of these LoRAs) writes
+`ss_base_model_version: "sdxl_base_v1-0"` into the header regardless of which specific
+checkpoint was used, since it only records the base architecture family, not the
+fine-tune. `mapBaseModelToArchitecture()` maps that to the generic `"SDXL 1.0"` bucket,
+which is non-`"Unknown"`, so the header result won and the filename was discarded.
+
+**Not a regression** — this gap has existed since filename heuristics were introduced
+(commit `757358d`). It went unnoticed because sorted files normally already have a
+`.civitai.info` sidecar from an earlier Fetch run, and `analyzeSidecar()` supplies
+Civitai's own specific `baseModel` before the header path is ever reached. The bug only
+surfaces when Sort runs on files that have never been fetched.
+
+### Fix
+
+Generalized the existing Z-Image-only override in `ModelAnalyzer.java`
+(`isGenericSdxlBucket`/`isSpecificSdxlVariant` helpers): when the header resolves to the
+generic `"SDXL 1.0"` bucket and the filename names a more specific SDXL-derived family
+(Illustrious, NoobAI, Pony, Pony V7), the filename wins. Added 3 regression tests in
+`ModelAnalyzerTest.java` covering Illustrious, NoobAI/Pony, and the negative case (a
+generic filename keeps `"SDXL 1.0"`).
+
+### Fetch-first changes classification further — not a bug
+
+Re-running Sort after running Fetch first changed outcomes again: almost everything
+(including some NoobAI-named files) landed under `Illustrious`. Traced this to
+`analyzeSidecar()` short-circuiting on Civitai's own `baseModel` field, which for several
+models literally says `"Illustrious"` even when the model's own Civitai description says
+"Trained on NoobAI0.5" and the filename says "Noob" — NoobAI is itself a further
+fine-tune *of* Illustrious, and Civitai/uploaders often tag under the parent lineage.
+This is Civitai's own data granularity, not a defect in the app; fetching first is the
+more accurate path overall since it uses ground truth instead of a local guess.
+
+### Duplicate files surfaced during testing (cleaned up)
+
+Repeated test sorts (with and without Fetch first, run back-to-back without an Undo in
+between) surfaced 38 model groups that existed in **three** byte-identical copies each —
+one pre-existing correctly-organized copy plus two redundant copies shuffled between
+`SDXL 1.0`/`Uncategorized`/`Illustrious (1)` by the two test runs. The user confirmed
+these were pre-existing duplicates in their library, not created by this session's
+testing. Verified via SHA-256 on 3 samples (including a 4GB file) before deleting the
+two redundant copies (safetensors + `.civitai.info`/`.json`/`.preview.*` sidecars) of
+each, keeping the original `Illustrious\<name>.*` set. **21.72 GB reclaimed, 276 files
+removed**, confirmed zero duplicates remaining on a final scan.
+
+### README and UI
+
+- Replaced two stale README screenshot references (`Organizer-LMO.png`,
+  `Fetcher-LMO.png` — neither matched any file on disk) with the real screenshots in
+  `frontend/src/assets/screenshots/`, using the same hero + highlights + collapsible
+  layout as Latent Library's README.
+- Added a "run Fetcher first" disclaimer in two places: the README (a tip callout under
+  the Sorter screenshot) and the Sorter view itself (`SorterView.vue`, reusing the
+  `.info-banner-ds` pattern already established in `FetcherView.vue` for visual
+  consistency).
+
+**Verification**: `mvn test` — 86 tests, 0 failures, BUILD SUCCESS. `cd frontend && npm
+run build` clean.
+
