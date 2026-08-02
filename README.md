@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="frontend/src/assets/latent-mark.svg" width="64" alt="Latent Logo">
+</p>
+
 # Latent Model Organizer
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
