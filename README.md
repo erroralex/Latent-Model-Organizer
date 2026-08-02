@@ -16,16 +16,42 @@ A high-performance, ultra-low-memory desktop utility designed to wrangle massive
 ## 📸 Interface
 
 <p align="center">
-  <img src="frontend/src/assets/screenshots/Organizer-LMO.png" width="800" alt="Main Organizer Interface">
+  <img src="frontend/src/assets/screenshots/Sorter.png" width="800" alt="Main Sorter Interface">
   <br>
   <i>Sleek, frameless desktop UI with tabbed navigation for Sorting and Fetching.</i>
 </p>
 
+### Sorting & Fetching
+
 <p align="center">
-  <img src="frontend/src/assets/screenshots/Fetcher-LMO.png" width="800" alt="CivitAi Fetcher">
+  <img src="frontend/src/assets/screenshots/Sorter_complete.png" width="800" alt="Sorter Run Summary">
+  <br>
+  <i><b>Sorter:</b> Organizes models by architecture, with a post-run summary of every move.</i>
+</p>
+
+> **💡 Tip:** Run **Fetcher** before **Sorter** for best results. Without a local `.civitai.info`
+> sidecar, the Sorter falls back to the model's internal `.safetensors` header or filename
+> heuristics — which is accurate for most architectures, but can't always distinguish
+> closely-related fine-tunes (e.g. Illustrious vs. NoobAI vs. Pony) the way Civitai's own
+> metadata can.
+
+<p align="center">
+  <img src="frontend/src/assets/screenshots/Fetcher.png" width="800" alt="CivitAi Fetcher">
   <br>
   <i><b>Fetcher:</b> Fetches metadata and preview images from Civitai.</i>
 </p>
+
+<details>
+<summary><b>View More Features (Fetcher Run Summary)</b></summary>
+<br>
+
+<p align="center">
+  <img src="frontend/src/assets/screenshots/Fetcher_complete.png" width="800" alt="Fetcher Run Summary">
+  <br>
+  <i><b>Fetcher Summary:</b> Tallies metadata retrieved, previews downloaded, and trigger words saved.</i>
+</p>
+
+</details>
 
 ---
 

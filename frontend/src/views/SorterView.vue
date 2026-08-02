@@ -8,7 +8,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
 import {
   HelpCircle, FolderOpen, ExternalLink, ChevronDown, CheckSquare, Square,
-  CheckCircle2, Loader2, Timer, ArrowUpDown, XCircle, Undo2,
+  CheckCircle2, Loader2, Timer, ArrowUpDown, XCircle, Undo2, Info,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -249,6 +249,16 @@ const handleExecute = () => {
       </button>
     </div>
 
+    <!-- Info Banner -->
+    <div class="info-banner-ds">
+      <Info :size="18" class="info-banner-icon" />
+      <div class="info-banner-text">
+        <p>Works best when run <strong>after Fetcher</strong>. Without a local <code>.civitai.info</code> sidecar,
+          the Sorter falls back to the model's internal header or filename to guess its architecture, which can't
+          always tell closely-related fine-tunes apart (e.g. Illustrious vs. NoobAI vs. Pony).</p>
+      </div>
+    </div>
+
     <!-- Source Directory -->
     <div class="card-group-ds">
       <div class="card-header-ds">
@@ -468,6 +478,29 @@ const handleExecute = () => {
 
 .info-icon-btn:hover {
   color: var(--color-accent-primary);
+}
+
+.info-banner-ds {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: var(--color-accent-primary-bg);
+  border: 1px solid rgba(79, 216, 208, 0.2);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: var(--text-body-sm, 13px);
+  color: var(--color-text-secondary);
+}
+
+.info-banner-icon {
+  color: var(--color-accent-primary);
+  font-size: 1.1rem;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.info-banner-text p {
+  margin: 2px 0;
 }
 
 .card-group-ds {
