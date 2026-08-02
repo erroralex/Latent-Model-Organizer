@@ -228,13 +228,13 @@ const statusIcon = computed(() => {
       <div class="titlebar-drag-region"></div>
 
       <div class="window-controls-ds no-drag">
-        <button class="win-btn-ds" @click="minimizeWindow" title="Minimize">
+        <button class="win-btn-ds min" @click="minimizeWindow" title="Minimize">
           <span>–</span>
         </button>
-        <button class="win-btn-ds" @click="maximizeWindow" title="Maximize">
+        <button class="win-btn-ds max" @click="maximizeWindow" title="Maximize">
           <span>▢</span>
         </button>
-        <button class="win-btn-ds danger" @click="closeWindow" title="Close">
+        <button class="win-btn-ds close" @click="closeWindow" title="Close">
           <span>✕</span>
         </button>
       </div>
@@ -417,10 +417,22 @@ body {
   border-color: var(--color-border-subtle);
 }
 
-.win-btn-ds.danger:hover {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-  border-color: rgba(242, 102, 91, 0.3);
+.win-btn-ds.min:hover {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border-color: transparent;
+}
+
+.win-btn-ds.max:hover {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border-color: transparent;
+}
+
+.win-btn-ds.close:hover {
+  background: var(--color-danger);
+  color: #ffffff;
+  border-color: transparent;
 }
 
 .app-body-ds {

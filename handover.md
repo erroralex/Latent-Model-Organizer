@@ -333,3 +333,21 @@ the same mechanism here for consistency across all three apps:
 
 **Verification**: `cd frontend && npm run build` clean.
 
+---
+
+## 12. Titlebar Window-Control Hover Colors
+
+Follow-up from a user screenshot comparison: Latent Tools' titlebar min/max/close
+buttons each get a distinct hover color (amber/green/red), while this app's
+`.win-btn-ds` only distinguished close (a `danger`-tinted background) and left
+minimize/maximize on the generic gray hover. Renamed the modifier classes on
+`App.vue`'s three window-control buttons from generic/`danger` to `min`/`max`/`close`
+and added matching hover rules: `.min:hover` uses `--color-warning`/`-bg`,
+`.max:hover` uses `--color-success`/`-bg`, `.close:hover` switched from the tinted
+`--color-danger-bg` to a solid `--color-danger` background with white text — matching
+Tools' `#win-close:hover` exactly. The unrelated `.win-btn-ds` single-close-button
+usages in `InfoModal.vue`/`Settingsmodal.vue`/`Summarymodal.vue` (dialog close, not
+window controls) were left untouched.
+
+**Verification**: `cd frontend && npm run build` clean.
+
