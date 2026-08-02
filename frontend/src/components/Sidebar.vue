@@ -226,8 +226,10 @@ const emit = defineEmits(['update:activeTab', 'update:showSettings', 'update:con
 }
 
 .dev-logo-img {
-  width: 64px;
+  max-width: 120px;
   height: auto;
+  max-height: 44px;
+  object-fit: contain;
 }
 
 .sr-only {

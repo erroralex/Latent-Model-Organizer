@@ -302,9 +302,13 @@ screenshot comparison against Latent Library:
   matching the pattern the Ko-fi link already used. (Latent Library doesn't have this
   bug — its `electron/main.js` has a global `setWindowOpenHandler` that intercepts all
   external links app-wide, not just ones explicitly wired through IPC.)
-- **Dev-credit logo size**: already correct here (`width: 64px`) — this was the
-  reference value Latent Library's `.dev-logo-img` (previously `max-width: 120px;
-  max-height: 44px`) was brought into alignment with. No change needed in this repo.
+- **Dev-credit logo size**: initially left as-is here (`width: 64px`) since Latent
+  Library's `.dev-logo-img` was brought down to match it. The user then said the
+  64px version read as too tiny and preferred Library's original
+  `max-width: 120px; max-height: 44px` sizing — so this repo's `.dev-logo-img` was
+  updated to `max-width: 120px; height: auto; max-height: 44px; object-fit:
+  contain;` to match instead, flipping which app was the reference value for this
+  one property.
 
 **Verification**: `cd frontend && npm run build` clean.
 
