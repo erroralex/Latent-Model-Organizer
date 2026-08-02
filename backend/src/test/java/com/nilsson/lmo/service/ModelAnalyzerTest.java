@@ -134,6 +134,59 @@ class ModelAnalyzerTest {
     }
 
     @Test
+    void analyze_shouldPreferFilenameOverGenericSdxlHeaderForIllustrious() throws IOException {
+        // Kohya writes ss_base_model_version as the generic SDXL architecture even when the
+        // checkpoint is actually an Illustrious fine-tune.
+        Path modelFile = tempDir.resolve("illustriousXL_stabilizer_v1.23.safetensors");
+        String jsonHeader = "{\"__metadata__\": {\"ss_base_model_version\": \"sdxl_base_v1-0\"}}";
+        byte[] headerBytes = jsonHeader.getBytes();
+
+        ByteBuffer buffer = ByteBuffer.allocate(8 + headerBytes.length).order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putLong(headerBytes.length);
+        buffer.put(headerBytes);
+
+        Files.write(modelFile, buffer.array());
+
+        ModelMetadata metadata = modelAnalyzer.analyze(modelFile);
+
+        assertEquals("Illustrious", metadata.architecture());
+    }
+
+    @Test
+    void analyze_shouldPreferFilenameOverGenericSdxlHeaderForNoobAiAndPony() throws IOException {
+        String jsonHeader = "{\"__metadata__\": {\"ss_base_model_version\": \"sdxl_base_v1-0\"}}";
+        byte[] headerBytes = jsonHeader.getBytes();
+        ByteBuffer buffer = ByteBuffer.allocate(8 + headerBytes.length).order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putLong(headerBytes.length);
+        buffer.put(headerBytes);
+
+        Path noobFile = tempDir.resolve("noobaiXLNAIXL_epsilonPred11Version-lora.safetensors");
+        Files.write(noobFile, buffer.array());
+        assertEquals("NoobAI", modelAnalyzer.analyze(noobFile).architecture());
+
+        Path ponyFile = tempDir.resolve("queencomplex_pony_v1.safetensors");
+        Files.write(ponyFile, buffer.array());
+        assertEquals("Pony", modelAnalyzer.analyze(ponyFile).architecture());
+    }
+
+    @Test
+    void analyze_shouldNotOverrideGenericSdxlHeaderWhenFilenameHasNoSpecificHint() throws IOException {
+        Path modelFile = tempDir.resolve("generic_style_lora.safetensors");
+        String jsonHeader = "{\"__metadata__\": {\"ss_base_model_version\": \"sdxl_base_v1-0\"}}";
+        byte[] headerBytes = jsonHeader.getBytes();
+
+        ByteBuffer buffer = ByteBuffer.allocate(8 + headerBytes.length).order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putLong(headerBytes.length);
+        buffer.put(headerBytes);
+
+        Files.write(modelFile, buffer.array());
+
+        ModelMetadata metadata = modelAnalyzer.analyze(modelFile);
+
+        assertEquals("SDXL 1.0", metadata.architecture());
+    }
+
+    @Test
     void analyze_shouldIdentifyNewModelsViaHeuristics() throws IOException {
         // Wan 2.7 Video and Image
         Path wanVideoFile = tempDir.resolve("wan2.7_t2v_test.safetensors");

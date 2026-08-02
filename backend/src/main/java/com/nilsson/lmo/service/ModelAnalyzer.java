@@ -100,6 +100,13 @@ public class ModelAnalyzer {
                         logger.info("Heuristic override for Z Image variant: '{}' → '{}'", fileName, filenameArch);
                         return new ModelMetadata(fileName, filenameArch, headerMetadata.baseModel());
                     }
+                    // Kohya writes ss_base_model_version as the generic SDXL architecture even when the
+                    // checkpoint was actually Illustrious/NoobAI/Pony, since it only knows the base
+                    // architecture family, not the fine-tune; filename is the more specific signal here.
+                    if (isGenericSdxlBucket(headerMetadata.architecture()) && isSpecificSdxlVariant(filenameArch)) {
+                        logger.info("Heuristic override for SDXL-derived variant: '{}' → '{}'", fileName, filenameArch);
+                        return new ModelMetadata(fileName, filenameArch, headerMetadata.baseModel());
+                    }
                     return headerMetadata;
                 }
             }
@@ -479,6 +486,15 @@ public class ModelAnalyzer {
 
     private static boolean isZImageFamily(String architecture) {
         return "Z Image Turbo".equals(architecture) || "Z Image Base".equals(architecture);
+    }
+
+    private static boolean isGenericSdxlBucket(String architecture) {
+        return "SDXL 1.0".equals(architecture);
+    }
+
+    private static boolean isSpecificSdxlVariant(String architecture) {
+        return "Illustrious".equals(architecture) || "NoobAI".equals(architecture)
+                || "Pony".equals(architecture) || "Pony V7".equals(architecture);
     }
 
     private static boolean containsToken(String text, String token) {
