@@ -27,6 +27,9 @@ We welcome contributions! Please follow these guidelines.
     *   Run `npm install`.
     *   Run `npm start` to launch the desktop application.
 
+See [AGENTS.md](AGENTS.md) for the full engineering rulebook (testing contracts, git conventions, module boundaries, etc.)
+that applies to all contributions, human or AI-assisted.
+
 ## Code Style
 
 *   **Java:** Follow standard Java conventions. Use 4 spaces for indentation.

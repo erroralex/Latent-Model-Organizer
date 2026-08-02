@@ -118,7 +118,7 @@ npm run dist
 
 | Platform | Output |
 |---|---|
-| Windows | `Latent Model Organizer Setup X.X.X.exe` |
+| Windows | `Latent Model Organizer X.X.X.exe` (portable, no installer) |
 | Linux | `Latent Model Organizer-X.X.X.AppImage` |
 | macOS | `Latent Model Organizer-X.X.X.dmg` |
 

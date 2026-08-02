@@ -5,6 +5,25 @@
     <artifactId>latent-model-organizer-backend</artifactId>
     <version>1.2.0</version>
     <name>Latent Model Organizer</name>
+    <description>Latent Model Organizer backend</description>
+    <url>https://github.com/erroralex/Latent-Model-Organizer</url>
+
+    <licenses>
+        <license>
+            <name>MIT License with Commons Clause</name>
+            <url>https://github.com/erroralex/Latent-Model-Organizer/blob/main/LICENSE</url>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <name>Alexander Nilsson</name>
+        </developer>
+    </developers>
+    <scm>
+        <connection>scm:git:https://github.com/erroralex/Latent-Model-Organizer.git</connection>
+        <developerConnection>scm:git:https://github.com/erroralex/Latent-Model-Organizer.git</developerConnection>
+        <url>https://github.com/erroralex/Latent-Model-Organizer</url>
+    </scm>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>

@@ -11,8 +11,8 @@
     "start": "electron .",
     "dist": "electron-builder"
   },
-  "author": "Latent Model Organizer",
-  "license": "ISC",
+  "author": "Alexander Nilsson",
+  "license": "SEE LICENSE IN LICENSE",
   "type": "commonjs",
   "devDependencies": {
     "electron": "^28.0.0",
