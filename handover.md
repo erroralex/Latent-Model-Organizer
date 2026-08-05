@@ -240,8 +240,10 @@ git log --oneline origin/main..origin/development   # must be empty
   `.gitignore`, so it shows up in every status listing. Delete it or ignore it.
 - **`docs/` is untracked** and currently holds an uncommitted `code_review.md`. Decide whether it
   belongs in the repo or in `.gitignore`; right now it is neither.
-- **Stale branch.** `feature/ui-redesign-latent-ds` is fully merged into `main` (zero unmerged
-  commits) but still exists both locally and on `origin`. Safe to delete.
+- **`development` is behind `main`.** The release process above starts by bumping the version on
+  `development` and opening a PR into `main`, but `development` is currently 17 commits behind —
+  recent work went straight to `main`. Fast-forward it (`git push origin main:development`) before
+  the next release, or that PR will drag in a stale branch.
 - **Windows-only link setup.** `.agents/AGENTS.md` is an NTFS hard link to the root `AGENTS.md`,
   and `.claude/skills` is an NTFS junction to `.agents/skills`. Neither survives a clone on
   another machine or a non-Windows checkout, so a fresh environment needs them recreated before
