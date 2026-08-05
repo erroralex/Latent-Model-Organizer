@@ -1,116 +1,226 @@
-# Project Handover - Recent Fixes and Setup
+# Handover — Latent Model Organizer
 
-This document summarizes the recent changes made to **Latent Model Organizer** during this session.
+Current state of the project, the traps that will bite you, and what is still open.
 
----
-
-## 1. AI Guidelines Setup
-
-Following the **Drop-in Brain** guidelines, the project has been fully configured for AI assistants:
-- **`AGENTS.md` (Root):** Configured with exact project details (name, purpose, Java 21/Vue 3/Electron stack, build/test/run commands) and target addons: **Frontend Core** and **Vue (3.x)**.
-- **`GEMINI.md` (Root):** Created as a byte-for-byte copy of `AGENTS.md` to support Gemini CLI.
-- **`.agents/AGENTS.md` (NTFS Hard Link):** Hard-linked to `AGENTS.md` in the root to allow Antigravity (Gemini) to automatically discover project-scoped instructions.
-- **`CLAUDE.md` (Root):** Created as the import shim (`@AGENTS.md`) for Claude Code compatibility.
-- **`.claude/settings.json`:** Tailored with specific permission rules allowing Git, Maven (`mvn`), and Node (`npm`) operations without prompt noise.
-- **`.agents/skills/`:** Created and populated with:
-  - Custom skill: `ai-setup-doctor` (for self-diagnostics)
-  - Upstream skills: `frontend-design`, `web-design-guidelines`, `vue`, and `vitest` (installed via the `skills` CLI).
-- **`.claude/skills` (Junction Link):** Created as an NTFS Junction pointing to `.agents/skills` to expose skills to Claude Code.
-- **`.gitignore`:** Appended `.claude/skills/` to prevent committing the linked directory contents twice.
+**This document is not a changelog.** Per-change narrative lives in git history (`git log`) and
+in the GitHub releases. What belongs here is only what a newcomer cannot derive from reading the
+code: non-obvious domain rules, the reasoning behind them, and open work.
 
 ---
 
-## 2. Krea 2 & New Base Models Support
+## What this is
 
-Added sorting and Civitai metadata mapping for several new base models and architectures:
-- **Krea 2**
-- **Wan Video 2.7** and **Wan Image 2.7**
-- **LTXV 2.3**
-- **Qwen 2**
-- **HiDream-O1**
-- **Ideogram 4.0**
-- **Grok**
+A desktop utility that organises large AI model libraries (`.safetensors`) by architecture, using
+zero-copy safetensors header parsing plus Civitai metadata fetching. Two workflows:
 
-### Technical Details:
-- **`ModelAnalyzer.java`:**
-  - Added new models to the `SUPPORTED_ARCHITECTURES` list.
-  - Implemented token and string checks in `checkFilenameHeuristics` to identify these architectures from filenames.
-  - Added mappings in `mapBaseModelToArchitecture` to map incoming baseModel values from the Civitai API to their corresponding architectures.
-- **`ModelAnalyzerTest.java`:**
-  - Added comprehensive unit tests verifying that all new architectures are correctly detected through filename heuristics, sidecars, and internal headers.
+- **Sorter** — classifies models by architecture and relocates them into per-architecture folders,
+  with a persistent undo manifest.
+- **Fetcher** — fills in missing sidecar metadata and preview images from Civitai, and writes
+  trigger words and descriptions into the file the WebUI actually reads.
+
+### Stack
+
+| Layer | Stack | Location |
+|---|---|---|
+| Backend | Java 21, **raw `com.sun.net.httpserver.HttpServer`** | `backend/` |
+| Frontend | Vue 3.5 + Vite 7 + PrimeVue 4.5 | `frontend/` |
+| Desktop shell | Electron 28 | `electron/` |
+
+**There is no Spring here.** The backend is a plain `main()` that builds an `HttpServer` on an
+ephemeral port with a virtual-thread executor. The only runtime dependencies are Jackson, SLF4J
+and Logback; tests add JUnit 5, Mockito and ArchUnit. Do not reach for Spring idioms
+(`@RestController`, `@Service`, dependency injection) — nothing will wire them up. `AGENTS.md`
+states this correctly and is worth trusting.
+
+Backend version `1.2.0` (`backend/pom.xml` — the single source of truth, see Releases).
+
+### Repository map
+
+- `backend/src/main/java/com/nilsson/lmo/`
+  - `LmoApplication.java` — entry point, HTTP routing, and the API surface. All routes are
+    registered here via `server.createContext(...)`, each wrapped in `SecurityFilter`.
+  - `service/` — the real logic: `ModelAnalyzer` (architecture detection), `OrganizationService`
+    (move/undo), `CivitaiApiClient`, `ForgeUserMetadataWriter`, `UserMetadataBackfillService`.
+  - `api/` — `SecurityFilter` (startup-token auth), `LogStreamHandler` + `SseLogAppender`
+    (Server-Sent Events log streaming to the UI).
+  - `domain/` — request/report records. `util/` — `HashUtil`, `HtmlToPlainText`.
+- `frontend/src/` — `views/SorterView.vue` and `views/FetcherView.vue` are the two screens;
+  `components/` holds the sidebar, console window and three modals. Design System tokens live in
+  `assets/css/latent/`.
+- `electron/main.js` — spawns the backend jar, discovers its port, owns the window.
+- `.run/` — shared IntelliJ run configurations (committed deliberately; see below).
+
+### API surface
+
+`POST /api/organize`, `/api/undo`, `/api/fetch`, `/api/backfill-metadata`, `/api/shutdown`,
+`/api/cancel`; `GET /api/logs` (SSE), `/api/progress`, `/api/architectures`, `/api/version`.
 
 ---
 
-## 3. Verification Status
+## How a model gets classified
 
-- **Setup Doctor Checklist:** Checked via the `ai-setup-doctor` skill: **10/10 PASS**.
-- **Backend Unit Tests:** Ran all 29 unit tests in the `backend/` directory:
-  ```powershell
-  & "C:\Program Files\JetBrains\IntelliJ IDEA 2025.2.3\plugins\maven-plugin\lib\maven3\bin\mvn.cmd" test
-  ```
-  (The bundled Maven lives under `plugins\maven-plugin\`, not `plugins\maven\`; the folder
-  was renamed in recent IntelliJ builds. There is no standalone `mvn` on the PATH.)
-  Result: **BUILD SUCCESS** (29 tests run, 0 failures).
+`ModelAnalyzer.analyze()` resolves an architecture in this order, and **the order is the whole
+design**:
+
+1. **Sidecar** (`.civitai.info`) — Civitai's own `baseModel`, mapped through
+   `mapBaseModelToArchitecture()`. Ground truth when present.
+2. **Safetensors internal header** — `ss_base_model_version` and friends, read zero-copy.
+3. **Filename heuristics** — `checkFilenameHeuristics()`, the last resort.
+
+Fifteen architectures are currently supported (`SUPPORTED_ARCHITECTURES`).
+
+### The generic-SDXL override exists for a reason
+
+Illustrious, NoobAI and Pony are all SDXL fine-tunes, and **kohya_ss writes
+`ss_base_model_version: "sdxl_base_v1-0"` into the header regardless of which specific checkpoint
+was used** — it records the base family, not the fine-tune. That maps to the generic `"SDXL 1.0"`
+bucket, which is not `"Unknown"`, so before the fix the header won and the filename was discarded:
+`illustriousXL_*` and `noobaiXL_*` LoRAs sorted into `SDXL 1.0`.
+
+`isGenericSdxlBucket()` / `isSpecificSdxlVariant()` implement the narrow override: when the header
+resolves to generic SDXL **and** the filename names a more specific SDXL-derived family, the
+filename wins. Do not widen this into "filename always beats header" — the header is more reliable
+everywhere else.
+
+This only ever surfaced on files that had never been fetched, because a `.civitai.info` sidecar
+short-circuits at step 1.
+
+### Fetch-first changes results, and that is correct
+
+Running Fetch before Sort will reclassify some files — notably NoobAI-named models landing under
+`Illustrious`. That is Civitai's own data granularity: NoobAI is a fine-tune *of* Illustrious and
+uploaders often tag the parent lineage. Fetching first is still the more accurate path because it
+uses Civitai's data instead of a local guess. This is not a bug; the UI tells users to fetch first.
 
 ---
 
-## 4. Releases
+## Invariants and traps
 
-v1.1.0 was the first release since v1.0.0, covering the Krea 2 and new base model support above.
-v1.2.0 followed with the Forge user-metadata work.
+### The WebUI reads `<basename>.json`, not `.civitai.info`
 
-### Process (source of truth for future releases)
+`.civitai.info` belongs to the Civitai Helper extension. A1111 / Forge / Forge Neo never read it —
+verified against a local Forge Neo install, where `modules/extra_networks.py` `get_user_metadata()`
+reads exactly one file, `<basename>.json`, and the LoRA metadata editor populates "Activation text"
+from its `"activation text"` key and "Description" from `"description"`.
 
-- Version lives in **`backend/pom.xml`** only. `build.yml` reads it via
-  `mvn help:evaluate -Dexpression=project.version` and syncs it into
-  `electron/package.json` and `frontend/package.json` at build time via
-  `npm version --no-git-tag-version` — no need to hand-edit those files.
-- Release flow:
-  1. Bump `<version>` in `backend/pom.xml` on `development`, commit, push.
-  2. Open a PR from `development` into `main` (repo convention: one PR per merge,
-     visible in `git log` as `Merge pull request #N from erroralex/development`).
-  3. After merge, tag the merge commit on `main` as `vX.Y.Z` and push the tag:
-     `git tag -a vX.Y.Z <commit> -m "..."` then `git push origin vX.Y.Z`.
-  4. Pushing the tag triggers `.github/workflows/build.yml`, which builds
-     Windows/Linux/macOS artifacts and publishes a GitHub Release automatically.
-- `gh` CLI is **not installed** on this machine — PRs must be opened manually via
-  the GitHub compare URL (`https://github.com/erroralex/Latent-Model-Organizer/compare/main...development`).
+This is why `ForgeUserMetadataWriter` exists: the data was already on disk and simply invisible.
+It merge-writes, filling each field only when blank so user edits survive, via temp file + atomic
+move.
 
-### What shipped in 1.1.0
+Three details that are easy to get wrong:
 
-- Version bump `1.0.0` → `1.1.0` (`backend/pom.xml`).
-- Krea 2, Wan Video/Image 2.7, LTXV 2.3, Qwen 2, HiDream-O1, Ideogram 4.0, and
-  Grok architecture support (already implemented in section 2 above; this release
-  just ships it).
-- Tagged and pushed as `v1.1.0` on the `main` merge commit — release build triggered
-  via GitHub Actions.
+- **Do not write the `sd version` key.** Forge Neo has diverged from upstream: its editor saves
+  `"sd version"` but `read_user_metadata` reads `sd_version_str`. Writing it achieves nothing and
+  risks confusing the editor.
+- **Strip commas from `trainedWords` entries.** Many Civitai authors leave a trailing comma on
+  each entry; joining verbatim with the `,, ` section separator produces `,,,` runs that shift the
+  Card Master extension's section boundaries. Regression tests cover this.
+- **There are two description fields, and they are not concatenated.** `model.description` is the
+  model page text; the top-level `description` is a short version note. The model one wins, with
+  the version note as fallback. (In the reference library of 1764 sidecars: 1260 vs 592.)
 
-### What shipped in 1.2.0
+Descriptions arrive as HTML and the WebUI escapes them by default
+(`extra_networks_card_description_is_html` defaults to `false`), so `HtmlToPlainText` reduces them
+to text — otherwise every card renders literal `<p>` tags.
 
-- Version bump `1.1.0` → `1.2.0` (`backend/pom.xml`).
-- Trigger words and Civitai descriptions written into the `<basename>.json` user metadata that
-  A1111 / Forge / Forge Neo actually read (section 5).
-- `POST /api/backfill-metadata` and a Fetcher UI action to retrofit an existing library from
-  sidecars already on disk, without hashing or network calls.
-- Preview files now keep the extension the URL serves, so Civitai's `.mp4` animated previews
-  stop being written as undecodable `.png` (section 7).
-- Shared IntelliJ run configurations under `.run/` (section 6).
-- Tagged as `v1.2.0` on the `main` merge commit (`46c287d`) — release build triggered
-  via GitHub Actions.
+`POST /api/backfill-metadata` exists because `fetchMissingMetadata` skips any model that already
+has a sidecar, which on a mature library is nearly all of them. The backfill is offline, does no
+hashing or network calls, and is idempotent — safe to re-run.
 
-**Verified against a real library after release:** the backfill was run over the reference
-Forge Neo install and filled the previously-empty models; the previously broken animated
-previews now render. Both features are confirmed working outside the test suite.
+### Preview extensions come from the URL, never from `images[0].type`
 
-### A trap when tagging
+`type` describes what the **author uploaded**; the URL describes what the **CDN will return**, and
+only the latter can determine the filename on disk.
 
-`build.yml` reads the version from the pom **on the tagged commit**, so a tag placed on a
-`main` that has not yet received the version bump publishes a release whose name and artifacts
-disagree. This happened once: a PR was opened before the bump was pushed, so the merge brought
-in an older `development` and `main` still read `1.1.0`.
+In the reference library 27 sidecars have `type: "video"` but only 6 have an `.mp4` URL. The other
+26 carry a `.jpeg` URL with a `width=450` transform and Civitai returns a **still frame** — those
+bytes genuinely are JPEG. Keying off `type` would rename 26 working previews to `.mp4`, turning
+4 broken previews into 30.
 
-Always confirm the version on the exact commit being tagged, not merely that `main` looks
-current:
+The only strictly authoritative signal is the response `Content-Type` header, but that requires
+downloading before naming, and no case has been seen where the URL suffix disagreed with the bytes
+in a way that broke rendering.
+
+**Pre-existing mislabelling is harmless and should be left alone**: ~1715 preview files hold JPEG
+bytes in a `.preview.png` name because the Civitai Helper extension names every preview that way.
+Browsers sniff content type, so they render fine. Renaming them buys nothing.
+
+### Electron: external links need the IPC bridge
+
+`electron/main.js` has an `ipcMain.on('shell:openExternal', ...)` handler but **no
+`setWindowOpenHandler`** override. A plain `<a target="_blank">` therefore opens in a bare,
+unbranded Chromium window rather than the system browser. Route external links through a
+script-level function calling `window.electronAPI.openExternal(url)` — see `openDevProfile()` in
+`Sidebar.vue`, which also falls back to `window.open()` for when the app runs in a plain browser
+via `npm run dev`. (`openKofi()` in `Settingsmodal.vue` follows the same IPC pattern but has no
+such fallback, so that link is inert outside Electron.)
+
+Call it from `<script setup>`, not inline in the template: a bare `window.` reference inside a
+template expression did not resolve and the link silently did nothing.
+
+### Backend port and token handshake
+
+The backend binds port `0` so the OS assigns a free port, then writes `port:token` to
+`.lmo-port` in the system temp directory and also emits it on stdout. Electron reads that file;
+`SecurityFilter` rejects any `/api/` request without the token. In dev mode Electron waits for an
+externally started backend to produce the file. If you need to drive the API by hand, read the
+token from `%TEMP%\.lmo-port`.
+
+### Maven is not on the PATH
+
+There is **no Maven wrapper (`mvnw`)** in this repo — a genuine difference from Latent Library, so
+`mvn` in the docs is correct and should not be "fixed" to `./mvnw`. There is also no standalone
+`mvn` on the PATH. Use IntelliJ's bundled copy:
+
+```
+C:\Program Files\JetBrains\IntelliJ IDEA 2025.2.3\plugins\maven-plugin\lib\maven3\bin\mvn.cmd
+```
+
+Note `plugins\maven-plugin\`, not `plugins\maven\` — the folder was renamed in recent builds.
+
+### IntelliJ run configurations
+
+They live in `.run/` as committed, shared files rather than in the gitignored
+`.idea/workspace.xml`. If one reports "Configuration is still incorrect", the usual cause is a
+missing `<module>` element, which leaves it with no classpath.
+
+**The module is named after the artifactId, not the directory**: `latent-model-organizer-backend`,
+not `backend`. A wrong name is silently stripped by the IDE on load.
+
+Two things that look like causes and are not: the `ALTERNATIVE_JRE_PATH` pin resolves fine, and
+`.idea/modules.xml` listing only `frontend` proves nothing — external module storage is enabled,
+so Maven-derived modules live outside `.idea/`. Query the running IDE rather than reading `.idea/`.
+Note also that the IDE uses the `IntelliJIdea2026.2` config directory despite the binary being
+2025.2.3.
+
+---
+
+## Releases
+
+Version lives in **`backend/pom.xml` only**. `.github/workflows/build.yml` reads it via
+`mvn help:evaluate -Dexpression=project.version` and syncs it into `electron/package.json` and
+`frontend/package.json` at build time with `npm version --no-git-tag-version`.
+
+**The committed versions in those two `package.json` files are therefore stale by design**
+(`electron/package.json` currently reads `1.0.0` against a pom of `1.2.0`). Do not hand-edit them
+to "fix" the mismatch.
+
+Flow:
+
+1. Bump `<version>` in `backend/pom.xml` on `development`, commit, push.
+2. Open a PR from `development` into `main` (repo convention: one PR per merge).
+3. Tag the merge commit on `main`: `git tag -a vX.Y.Z <commit> -m "..."` and push the tag.
+4. The tag triggers `build.yml`, which builds Windows/Linux/macOS artifacts and publishes a
+   GitHub Release.
+
+`gh` CLI is **not installed** on this machine, so PRs must be opened through the GitHub compare
+URL: `https://github.com/erroralex/Latent-Model-Organizer/compare/main...development`.
+
+### Tagging trap
+
+`build.yml` reads the version from the pom **on the tagged commit**. Tagging a `main` that has not
+yet received the bump publishes a release whose name and artifacts disagree — this has happened
+once. Confirm the version on the exact commit being tagged, not merely that `main` looks current:
 
 ```bash
 git fetch origin
@@ -120,349 +230,52 @@ git log --oneline origin/main..origin/development   # must be empty
 
 ---
 
-## 5. LoRA Trigger Words & Descriptions
+## Open issues
 
-Civitai's `by-hash` response already contains a `trainedWords` array and two description fields,
-and the fetcher already wrote the whole response to `<basename>.civitai.info`. Both were
-therefore on disk but invisible to the WebUI.
-
-**Why:** A1111 / Forge / Forge Neo never read `.civitai.info` — that format belongs to the
-Civitai Helper extension. Verified against a local Forge Neo install: `modules/extra_networks.py`
-`get_user_metadata()` reads exactly one file, `<basename>.json`, and
-`extensions-builtin/sd_forge_lora/ui_edit_user_metadata.py` populates the "Activation text" box
-from its `"activation text"` key and the "Description" box from `"description"`.
-
-### What was added
-
-- **`ForgeUserMetadataWriter`** — joins `trainedWords` with `,, ` (the Civitai section convention
-  that the Card Master extension splits on), converts the description to plain text, and
-  merge-writes `<basename>.json`. Each field is filled only when blank, so anything the user
-  wrote survives; writes go through a temp file + atomic move. Returns a `WriteOutcome` naming
-  which fields were added, so callers can tally them separately.
-- **`HtmlToPlainText`** — Civitai serves descriptions as HTML, and the WebUI escapes them by
-  default (`extra_networks_card_description_is_html` defaults to `false` in
-  `modules/shared_options.py`), so raw markup would render as literal `<p>` tags on every card.
-  A small dependency-free converter reduces them to text.
-- **`UserMetadataBackfillService`** + `POST /api/backfill-metadata` — an offline pass over
-  existing `.civitai.info` sidecars. No hashing, no network, idempotent, so it is safe to re-run.
-  Needed because `fetchMissingMetadata` skips any model that already has a sidecar, which on a
-  mature library is nearly all of them.
-- **Fetcher UI** — a "Trigger Words & Descriptions" section with a backfill button, reusing the
-  existing Deep Scan / Dry Run toggles.
-
-### Gotchas discovered
-
-- Many Civitai authors leave a **trailing comma** on each `trainedWords` entry. Joining verbatim
-  produced `,,,` runs that shift Card Master's section boundaries; entries are now stripped of
-  surrounding commas and whitespace (regression tests cover this).
-- Do **not** write the `sd version` key. Forge Neo has diverged from upstream: the editor saves
-  `"sd version"` but `read_user_metadata` looks for `sd_version_str`.
-- There are **two** description fields. `model.description` is the model page text (present in
-  1260 of 1764 sidecars in the reference library); the top-level `description` is a short version
-  note (592). The model one wins, with the version note as fallback — they are not concatenated.
+- **No frontend tests at all.** `frontend/package.json` has no `vitest` dependency and no `test`
+  script, even though a `vitest` skill is installed under `.agents/skills/`. All 86 tests are
+  backend JUnit. Either wire up Vitest or drop the skill so the tooling stops implying coverage
+  that does not exist.
+- **`drop-in-brain-main/` is untracked scaffolding sitting in the repo root.** It is not in
+  `.gitignore`, so it shows up in every status listing. Delete it or ignore it.
+- **`docs/` is untracked** and currently holds an uncommitted `code_review.md`. Decide whether it
+  belongs in the repo or in `.gitignore`; right now it is neither.
+- **Stale branch.** `feature/ui-redesign-latent-ds` is fully merged into `main` (zero unmerged
+  commits) but still exists both locally and on `origin`. Safe to delete.
+- **Windows-only link setup.** `.agents/AGENTS.md` is an NTFS hard link to the root `AGENTS.md`,
+  and `.claude/skills` is an NTFS junction to `.agents/skills`. Neither survives a clone on
+  another machine or a non-Windows checkout, so a fresh environment needs them recreated before
+  assistant instructions and skills resolve.
 
 ---
 
-## 6. IntelliJ Run Configurations
+## Build, test, run
 
-Run configurations now live in **`.run/`** as shared, committed files rather than in the
-gitignored `.idea/workspace.xml`.
+```bash
+# Backend tests (86, all JUnit) - use the IntelliJ-bundled mvn, see above
+cd backend && mvn test
 
-**Root cause of "Configuration is still incorrect":** the backend Application configuration
-declared **no `<module>`**, so it had no classpath. That alone invalidates the configuration.
-The shared config now declares `<module name="latent-model-organizer-backend" />`.
+# Backend package
+cd backend && mvn clean package -DskipTests
 
-**The module is named after the artifactId, not the directory.** It is
-`latent-model-organizer-backend`, not `backend` — an earlier `<module name="backend" />` was
-silently stripped by the IDE on load because no module answers to that name.
+# Frontend build (outputs to frontend/dist, which electron-builder copies in)
+cd frontend && npm run build
 
-### Two things that look like causes but are not
+# Packaged desktop app
+cd electron && npm run dist
+```
 
-- **The `ALTERNATIVE_JRE_PATH="liberica-full-21"` pin.** That SDK resolves fine. It was removed
-  anyway so the config inherits the project SDK and stays portable, but it was never the fault.
-- **`.idea/modules.xml` listing only `frontend` and the root module.** External module storage is
-  enabled (`ExternalStorageConfigurationManager`), so Maven-derived modules live outside `.idea/`
-  and never appear there. The backend module *is* imported; the file simply is not where to look.
-  Query the running IDE instead of reading `.idea/` when checking module state.
+Running locally:
 
-Note also that the **running IDE uses the `IntelliJIdea2026.2` config directory** even though the
-binary is 2025.2.3, so `$APPDATA\JetBrains\IntelliJIdea2025.2\` is the wrong place to inspect
-SDK tables for this project.
+```bash
+cd backend  && java -jar target/backend.jar   # terminal 1
+cd frontend && npm run dev                    # terminal 2 (Vite on :5173)
+cd electron && npm start                      # terminal 3
+```
 
-Verified by launching the configuration: the backend started and logged
-`LMO_PORT=…` normally.
+In dev mode Electron loads `http://localhost:5173`; in production it loads the packaged
+`frontend/dist`. Unlike Latent Library, the frontend is **not** bundled into the jar, so there is
+no stale-JAR trap for UI changes — but `npm run build` must have run before `npm run dist`, or the
+packaged app ships an old renderer.
 
----
-
-## 7. Preview Files
-
-`resolvePreviewExtension` recognised only jpg/jpeg/webp and defaulted everything else to
-`.preview.png`. Civitai serves animated previews as `.mp4`, so video bytes were written into
-files named `.png` — undecodable, and the card rendered "NO PREVIEW". The extension is now taken
-from the URL's final path segment, accepting the same media set as the WebUI's
-`default_allowed_preview_extensions`.
-
-### Do NOT switch this to `images[0].type`
-
-It looks like the authoritative signal and is not. `type` describes what the **author uploaded**;
-the URL describes what the **CDN will return**, and only the latter can determine the filename.
-
-In the reference library 27 sidecars have `type: "video"` but only 6 have a `.mp4` URL. The other
-26 carry a `.jpeg` URL with a `width=450` transform, and Civitai returns a **still frame** — the
-bytes on disk are genuinely JPEG. Keying the extension off `type` would rename those 26 working
-previews to `.mp4`, turning 4 broken previews into 30.
-
-The genuinely authoritative signal, if this ever needs hardening, is the response's
-`Content-Type` header — but it requires downloading before naming, and no case has been observed
-where the URL suffix disagreed with the actual bytes in a way that broke rendering.
-
-### Pre-existing mislabelling (harmless)
-
-1715 preview files have content that does not match their extension, almost all `jpeg` bytes in
-`.preview.png` — the Civitai Helper extension names every preview `.preview.png` regardless of
-content. These render correctly because browsers sniff content type. Not worth renaming.
-
----
-
-## 8. UI Redesign (Latent Design System Integration)
-
-The entire Vue 3 user interface has been reworked to conform to the unified **Latent Design System** (`https://github.com/erroralex/Latent-Design-System.git`). All changes were performed on the dedicated **`feature/ui-redesign-latent-ds`** branch.
-
-### Key Highlights
-
-- **Design System Token Suite:** Copied `styles.css` and token files (`colors.css`, `typography.css`, `spacing.css`, `effects.css`, `fonts.css`) into `frontend/src/assets/css/latent/`. Consolidated the app onto the single unified dark theme canvas (`#0A0A0D`), desaturated Latent Cyan (`#4FD8D0`) primary accent, and Latent Violet (`#9B7EF5`) secondary accent.
-- **Official App Mark & Assets:** Imported the official `latent-mark.svg` (cyan-to-violet gradient container with rounded L-glyph) and `latent-lockup.svg` from the upstream design system repo. The 52px frameless titlebar in `App.vue` now renders `latent-mark.svg`.
-- **Sidebar & Developer Attribution:** Updated `Sidebar.vue` to use standard `NavItem` styling with active tab highlights, a console toggle, and Alexander Nilsson's signature developer logo (`alx_logo.png`) linking to GitHub.
-- **View Refactoring:** `SorterView.vue` and `FetcherView.vue` refactored to use token cards, monospace inputs for folder paths, architecture badges, Deep Scan & Dry Run switches, and CTA buttons.
-- **Modals & Console:** `ConsoleWindow.vue`, `Settingsmodal.vue`, `Summarymodal.vue`, and `InfoModal.vue` restyled with tokenized dialog surfaces, desaturated backdrop scrims (`var(--color-surface-overlay)`), and JetBrains Mono monospace formatting.
-
-### Verification Status
-
-- **Frontend Build (`npm run build` in `frontend/`):** Passed with **BUILD SUCCESS** (zero compilation or CSS errors).
-- **Backend Unit Tests (`mvn test` in `backend/`):** Passed all **83 unit tests** (0 failures, BUILD SUCCESS).
-
----
-
-## 9. Icon System Standardization: PrimeIcons → Lucide
-
-This app was the reference standard for a cross-app pass bringing Latent Library and Latent
-Tools' chrome (sidebar, titlebar, icons) in line with it — the sidebar/titlebar here were
-already correct and untouched. What changed here was the icon system itself: this app used
-PrimeIcons (`pi pi-*`) exclusively, while Latent Library's main nav already used
-`lucide-vue-next`. Standardized all three apps on Lucide.
-
-- **`package.json`**: removed `primeicons`, added `"lucide-vue-next": "^1.0.0"` (matched to
-  the version pinned in Latent Library's `frontend/package.json` for consistency). Note: npm
-  flags `lucide-vue-next@1.0.0` as deprecated in favor of `@lucide/vue`, but the exact version
-  was kept to match the sibling app.
-- **9 files migrated**: `main.js` (dropped the `primeicons/primeicons.css` import),
-  `App.vue`, `components/ConsoleWindow.vue`, `components/InfoModal.vue`,
-  `components/Settingsmodal.vue`, `components/Sidebar.vue`, `components/Summarymodal.vue`,
-  `views/FetcherView.vue`, `views/SorterView.vue`. All icons here are rendered as plain
-  `<i class="pi ...">` elements (no PrimeVue Menu/TieredMenu icon-slot usage exists in this
-  codebase), so every conversion was a direct template swap to `<IconName :size="16" />` or
-  `<component :is="...">` for conditionally-chosen icons — no slot-plumbing needed, unlike
-  Library's PrimeVue `<Button icon="...">`/`<Tree>` cases.
-- Added a `.spin-icon` utility + `@keyframes spin` in `assets/css/components/base.css` for
-  the `Loader2` replacements of `pi-spin pi-spinner` (no spin animation existed previously).
-- `App.vue`'s status-bar icon previously combined multiple PrimeIcons classes
-  (`pi-check-circle`/`pi-exclamation-triangle`/`pi-times-circle`/`pi-info-circle`/
-  `pi-spin pi-spinner`) that could theoretically co-occur; replaced with a `statusIcon`
-  computed with an explicit priority order (processing spinner > success > warning > error >
-  default info) — a judgment call since the original classes had no documented precedence.
-- A handful of icons had no listed mapping and were chosen by best semantic match:
-  `pi-terminal`→`Terminal`, `pi-question-circle`→`HelpCircle`, `pi-chart-bar`→`BarChart3`,
-  `pi-inbox`→`Inbox`, `pi-check-square`/`pi-stop`→`CheckSquare`/`Square`,
-  `pi-stopwatch`→`Timer`, `pi-undo`→`Undo2`.
-- **Verification**: `grep -rn "pi pi-\|primeicons\|pi-spin" frontend/src` returns zero
-  results; `npm run build` succeeded (1764 modules, no errors). `lucide-vue-next` was
-  installed with `--no-save`-equivalent scope limited to itself (not a full reinstall) purely
-  to prove the build resolves the new import; `package-lock.json` reflects that one install.
-  `primeicons` has not yet been removed from `node_modules` via a full `npm install` —
-  `package.json` is the source of truth, a normal install will reconcile the lockfile.
-
----
-
-## 10. Post-Migration Fixes (found via user screenshots)
-
-Follow-up pass, same session as section 9 — two issues surfaced from a live
-screenshot comparison against Latent Library:
-
-- **Dev-credit logo opened in the wrong browser**: `components/Sidebar.vue`'s
-  GitHub-profile link was a plain `<a href="..." target="_blank">`. This app's
-  `electron/main.js` has an IPC `shell:openExternal` handler
-  (`ipcMain.on('shell:openExternal', ...)` → `shell.openExternal`, already used
-  correctly by `Settingsmodal.vue`'s Ko-fi link via
-  `window.electronAPI.openExternal(...)`) but **no `setWindowOpenHandler`** override
-  on the `BrowserWindow`'s `webContents`. Without that, Electron's default handling of
-  `target="_blank"` anchors opened the link in a bare, unbranded Chromium window
-  instead of the system default browser — reads as "the wrong browser" to a user.
-  Fixed by removing `target="_blank"` and routing the click through
-  `window.electronAPI.openExternal('https://github.com/erroralex')` on `@click.prevent`,
-  matching the pattern the Ko-fi link already used. (Latent Library doesn't have this
-  bug — its `electron/main.js` has a global `setWindowOpenHandler` that intercepts all
-  external links app-wide, not just ones explicitly wired through IPC.)
-  - **Follow-up**: that first fix put the `window.electronAPI?.openExternal(...)` call
-    inline in the template expression, and the link stopped opening anything at all.
-    No codebase precedent existed for a bare `window.` reference inside a Vue template
-    (every other external-link call, e.g. `Settingsmodal.vue`'s `openKofi`, is a
-    script-level function), so rather than debug Vue's `with`-block global-fallback
-    resolution for `window` inside compiled render functions, moved the logic into a
-    proper `openDevProfile()` function in `Sidebar.vue`'s `<script setup>` — matching
-    the established pattern exactly, including `openKofi`'s `window.open(url, '_blank')`
-    fallback for when `electronAPI` isn't present (e.g. running `npm run dev` in a
-    plain browser instead of the packaged Electron shell).
-- **Dev-credit logo size**: initially left as-is here (`width: 64px`) since Latent
-  Library's `.dev-logo-img` was brought down to match it. The user then said the
-  64px version read as too tiny and preferred Library's original
-  `max-width: 120px; max-height: 44px` sizing — so this repo's `.dev-logo-img` was
-  updated to `max-width: 120px; height: auto; max-height: 44px; object-fit:
-  contain;` to match instead, flipping which app was the reference value for this
-  one property.
-
-**Verification**: `cd frontend && npm run build` clean.
-
----
-
-## 11. Ctrl+Scroll UI Zoom (ported from Latent Tools)
-
-Latent Tools already shipped a Ctrl/Cmd+Mouse Wheel app-scale zoom (50%–250%, 5%
-steps, Ctrl+0 to reset) via Electron's `webFrame.setZoomFactor`/`getZoomFactor`. Ported
-the same mechanism here for consistency across all three apps:
-
-- **`electron/preload.js`**: `windowAPI` gained `getZoomFactor()`/`setZoomFactor(factor)`,
-  calling `webFrame` directly (no IPC round-trip needed).
-- **`frontend/src/composables/useUiZoom.js`** (new): a `wheel` listener gated on
-  `ctrlKey || metaKey` adjusts zoom by 0.05 per notch, clamped `[0.5, 2.5]`; a `keydown`
-  listener resets to `1.0` on Ctrl/Cmd+0 (skipped while a `TEXTAREA`/`INPUT` is
-  focused). Mounted once from `App.vue` via `useUiZoom()`, alongside the existing
-  `useTheme()` composable call.
-- No conflicting wheel handlers existed in this codebase (unlike Latent Library's image
-  viewers), so no guard clauses were needed elsewhere.
-- Zoom is not persisted across restarts, matching Tools' scope.
-
-**Verification**: `cd frontend && npm run build` clean.
-
----
-
-## 12. Titlebar Window-Control Hover Colors
-
-Follow-up from a user screenshot comparison: Latent Tools' titlebar min/max/close
-buttons each get a distinct hover color (amber/green/red), while this app's
-`.win-btn-ds` only distinguished close (a `danger`-tinted background) and left
-minimize/maximize on the generic gray hover. Renamed the modifier classes on
-`App.vue`'s three window-control buttons from generic/`danger` to `min`/`max`/`close`
-and added matching hover rules: `.min:hover` uses `--color-warning`/`-bg`,
-`.max:hover` uses `--color-success`/`-bg`, `.close:hover` switched from the tinted
-`--color-danger-bg` to a solid `--color-danger` background with white text — matching
-Tools' `#win-close:hover` exactly. The unrelated `.win-btn-ds` single-close-button
-usages in `InfoModal.vue`/`Settingsmodal.vue`/`Summarymodal.vue` (dialog close, not
-window controls) were left untouched.
-
-**Verification**: `cd frontend && npm run build` clean.
-
----
-
-## 13. License/Docs/Packaging Coherence Pass (Latent Library as reference)
-
-Auditing README/BUILDING/CONTRIBUTING/LICENSE against Latent Library (the reference
-app for this pass) turned up drift that predates this session:
-
-- **`backend/pom.xml`** had none of `<url>`/`<licenses>`/`<developers>`/`<scm>` —
-  Library got this metadata filled in during an earlier audit (see Library's
-  HANDOVER §10) but Organizer never received the same pass. Added the identical
-  block (license name `MIT License with Commons Clause`, developer `Alexander
-  Nilsson`, `scm`/`url` pointing at this repo).
-- **`electron/package.json`** had `"license": "ISC"` (a Spring-Initializr-style
-  default that was never actually correct — this project has no ISC-licensed code)
-  and `"author": "Latent Model Organizer"` (the product name, not a person). Fixed
-  to `"SEE LICENSE IN LICENSE"` and `"Alexander Nilsson"`, matching Library's
-  `electron/package.json` exactly.
-- **`frontend/package.json`** was missing a `license` field entirely; added
-  `"SEE LICENSE IN LICENSE"` to match Library's.
-- **`BUILDING.md`** documented the Windows build as `Latent Model Organizer Setup
-  X.X.X.exe`, implying an NSIS installer — but `electron/package.json`'s
-  `win.target` here is `"portable"`, same as Library. This is the exact bug Library
-  had and fixed in its own docs pass; ported the fix here too:
-  `Latent Model Organizer X.X.X.exe (portable, no installer)`.
-- **`CONTRIBUTING.md`** didn't reference `AGENTS.md` even though the file exists in
-  this repo; added the same pointer sentence Library's `CONTRIBUTING.md` has.
-- **Not touched deliberately**: Organizer's backend has no Maven wrapper (`mvnw`),
-  unlike Library, so `CONTRIBUTING.md`'s "run `mvn clean install`" (not `./mvnw`)
-  instruction is accurate as-is — a genuine tooling difference, not doc drift.
-
-**Verification**: `cd frontend && npm run build` clean; `pom.xml` confirmed
-well-formed XML; `package.json` files confirmed valid JSON.
-
----
-
-## 14. Illustrious/NoobAI/Pony Misclassified as "SDXL 1.0" During Sort
-
-The user ran a real sort over a Forge Neo Lora library and found LoRAs with names like
-`illustriousXL_stabilizer_v1.23` and `noobaiXLNAIXL_epsilonPred11Version-lora` landing in
-`SDXL 1.0` instead of `Illustrious`/`NoobAI`.
-
-### Root cause
-
-`ModelAnalyzer.analyze()` checks the safetensors internal header before filename
-heuristics, and returns immediately once the header resolves to anything other than
-`"Unknown"` — filename heuristics were only ever consulted for one narrow override (Z
-Image variants). Illustrious, NoobAI, and Pony are all SDXL fine-tunes, and kohya_ss (the
-tool that trains the overwhelming majority of these LoRAs) writes
-`ss_base_model_version: "sdxl_base_v1-0"` into the header regardless of which specific
-checkpoint was used, since it only records the base architecture family, not the
-fine-tune. `mapBaseModelToArchitecture()` maps that to the generic `"SDXL 1.0"` bucket,
-which is non-`"Unknown"`, so the header result won and the filename was discarded.
-
-**Not a regression** — this gap has existed since filename heuristics were introduced
-(commit `757358d`). It went unnoticed because sorted files normally already have a
-`.civitai.info` sidecar from an earlier Fetch run, and `analyzeSidecar()` supplies
-Civitai's own specific `baseModel` before the header path is ever reached. The bug only
-surfaces when Sort runs on files that have never been fetched.
-
-### Fix
-
-Generalized the existing Z-Image-only override in `ModelAnalyzer.java`
-(`isGenericSdxlBucket`/`isSpecificSdxlVariant` helpers): when the header resolves to the
-generic `"SDXL 1.0"` bucket and the filename names a more specific SDXL-derived family
-(Illustrious, NoobAI, Pony, Pony V7), the filename wins. Added 3 regression tests in
-`ModelAnalyzerTest.java` covering Illustrious, NoobAI/Pony, and the negative case (a
-generic filename keeps `"SDXL 1.0"`).
-
-### Fetch-first changes classification further — not a bug
-
-Re-running Sort after running Fetch first changed outcomes again: almost everything
-(including some NoobAI-named files) landed under `Illustrious`. Traced this to
-`analyzeSidecar()` short-circuiting on Civitai's own `baseModel` field, which for several
-models literally says `"Illustrious"` even when the model's own Civitai description says
-"Trained on NoobAI0.5" and the filename says "Noob" — NoobAI is itself a further
-fine-tune *of* Illustrious, and Civitai/uploaders often tag under the parent lineage.
-This is Civitai's own data granularity, not a defect in the app; fetching first is the
-more accurate path overall since it uses ground truth instead of a local guess.
-
-### Duplicate files surfaced during testing (cleaned up)
-
-Repeated test sorts (with and without Fetch first, run back-to-back without an Undo in
-between) surfaced 38 model groups that existed in **three** byte-identical copies each —
-one pre-existing correctly-organized copy plus two redundant copies shuffled between
-`SDXL 1.0`/`Uncategorized`/`Illustrious (1)` by the two test runs. The user confirmed
-these were pre-existing duplicates in their library, not created by this session's
-testing. Verified via SHA-256 on 3 samples (including a 4GB file) before deleting the
-two redundant copies (safetensors + `.civitai.info`/`.json`/`.preview.*` sidecars) of
-each, keeping the original `Illustrious\<name>.*` set. **21.72 GB reclaimed, 276 files
-removed**, confirmed zero duplicates remaining on a final scan.
-
-### README and UI
-
-- Replaced two stale README screenshot references (`Organizer-LMO.png`,
-  `Fetcher-LMO.png` — neither matched any file on disk) with the real screenshots in
-  `frontend/src/assets/screenshots/`, using the same hero + highlights + collapsible
-  layout as Latent Library's README.
-- Added a "run Fetcher first" disclaimer in two places: the README (a tip callout under
-  the Sorter screenshot) and the Sorter view itself (`SorterView.vue`, reusing the
-  `.info-banner-ds` pattern already established in `FetcherView.vue` for visual
-  consistency).
-
-**Verification**: `mvn test` — 86 tests, 0 failures, BUILD SUCCESS. `cd frontend && npm
-run build` clean.
-
+Before claiming a change works: run the tests and show the output.
