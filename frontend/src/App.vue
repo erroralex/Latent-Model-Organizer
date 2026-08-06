@@ -5,7 +5,6 @@
  * Primary layout shell for Latent Model Organizer aligned with the Latent Design System.
  */
 import { ref, computed, onMounted, watch } from 'vue';
-import { useTheme } from './composables/useTheme';
 import { useUiZoom } from './composables/useUiZoom';
 import ConsoleWindow from './components/ConsoleWindow.vue';
 import SummaryModal from './components/Summarymodal.vue';
@@ -16,7 +15,6 @@ import FetcherView from './views/FetcherView.vue';
 import latentMarkUrl from './assets/latent-mark.svg';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-vue-next';
 
-const { currentTheme, availableThemes, applyTheme } = useTheme();
 useUiZoom();
 
 const lsGet = (k, fb) => {
@@ -191,7 +189,6 @@ const initializeBackendConnection = async () => {
 };
 
 onMounted(async () => {
-  applyTheme();
   await initializeBackendConnection();
 });
 
@@ -318,13 +315,10 @@ const statusIcon = computed(() => {
 
     <SettingsModal
         v-if="showSettings"
-        :currentTheme="currentTheme"
-        :availableThemes="availableThemes"
         :isRecursive="isRecursive"
         :isDryRun="isDryRun"
         :apiBase="apiBase"
         :apiToken="apiToken"
-        @applyTheme="applyTheme"
         @update:isRecursive="v => isRecursive = v"
         @update:isDryRun="v => isDryRun = v"
         @close="showSettings = false"

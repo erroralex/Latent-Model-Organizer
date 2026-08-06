@@ -8,14 +8,12 @@ import { ref, onMounted } from 'vue';
 import { Settings as SettingsIcon, Palette, SlidersHorizontal, Heart } from 'lucide-vue-next';
 
 const props = defineProps({
-  currentTheme: { type: String, required: true },
-  availableThemes: { type: Array, required: true },
   isRecursive: { type: Boolean, required: true },
   isDryRun: { type: Boolean, required: true },
   apiBase: { type: String, required: true },
   apiToken: { type: String, required: true },
 });
-const emit = defineEmits(['applyTheme', 'update:isRecursive', 'update:isDryRun', 'close']);
+const emit = defineEmits(['update:isRecursive', 'update:isDryRun', 'close']);
 
 const appVersion = ref('dev');
 
