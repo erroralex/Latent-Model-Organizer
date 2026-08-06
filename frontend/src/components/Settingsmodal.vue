@@ -6,6 +6,7 @@
  */
 import { ref, onMounted } from 'vue';
 import { Settings as SettingsIcon, Palette, SlidersHorizontal, Heart } from 'lucide-vue-next';
+import LBadge from '@/components/ds/LBadge.vue';
 
 const props = defineProps({
   isRecursive: { type: Boolean, required: true },
@@ -63,7 +64,7 @@ onMounted(async () => {
               <span class="theme-name-ds">Latent Design System</span>
               <span class="theme-sub-ds">Unified Dark Theme (Cyan & Violet)</span>
             </div>
-            <span class="badge-ds accent">Active</span>
+            <LBadge variant="accent">Active</LBadge>
           </div>
         </section>
 
@@ -310,15 +311,6 @@ onMounted(async () => {
 
 .kofi-btn-ds:hover {
   opacity: 0.9;
-}
-
-.badge-ds.accent {
-  background: var(--color-accent-primary-bg);
-  color: var(--color-accent-primary);
-  border: 1px solid rgba(79, 216, 208, 0.25);
-  font-size: var(--text-caption, 11px);
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
 }
 
 .win-btn-ds {

@@ -6,6 +6,7 @@
  */
 import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Terminal, ArrowDown, Trash2, Loader2 } from 'lucide-vue-next';
+import LBadge from '@/components/ds/LBadge.vue';
 
 const props = defineProps({
   apiBase: { type: String, required: true },
@@ -104,7 +105,7 @@ onUnmounted(() => {
       <div class="console-left-ds">
         <Terminal :size="14" class="console-terminal-icon" />
         <span class="console-title-ds">Backend Logs</span>
-        <span class="badge-ds outline" v-if="logs.length > 0">{{ logs.length }}</span>
+        <LBadge variant="outline" v-if="logs.length > 0">{{ logs.length }}</LBadge>
       </div>
       <div class="console-right-ds">
         <button
@@ -230,17 +231,4 @@ onUnmounted(() => {
   gap: 8px;
 }
 
-.badge-ds {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  font-size: var(--text-caption, 11px);
-}
-
-.badge-ds.outline {
-  background: transparent;
-  color: var(--color-text-tertiary);
-  border: 1px solid var(--color-border-subtle);
-}
 </style>

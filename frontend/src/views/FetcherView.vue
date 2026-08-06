@@ -7,6 +7,7 @@
 import { ref, watch } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
 import { HelpCircle, FolderOpen, Info, CloudDownload, XCircle, Tags, Loader2 } from 'lucide-vue-next';
+import LBadge from '@/components/ds/LBadge.vue';
 
 const props = defineProps({
   isProcessing: { type: Boolean, default: false },
@@ -108,7 +109,7 @@ const handleBackfill = () => {
     <div class="card-group-ds backfill-section-ds">
       <div class="card-header-ds">
         <span class="card-title-ds">Trigger Words &amp; Descriptions</span>
-        <span class="badge-ds outline">Offline</span>
+        <LBadge variant="outline">Offline</LBadge>
       </div>
       <p class="card-helper-ds">
         Forge and A1111 read <code>&lt;model&gt;.json</code> rather than <code>.civitai.info</code>.
@@ -300,21 +301,6 @@ const handleBackfill = () => {
 .btn-ds:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.badge-ds {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  font-size: var(--text-caption, 11px);
-  font-weight: var(--weight-semibold);
-}
-
-.badge-ds.outline {
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border-strong);
 }
 
 .info-banner-ds {

@@ -10,6 +10,7 @@ import {
   HelpCircle, FolderOpen, ExternalLink, ChevronDown, CheckSquare, Square,
   CheckCircle2, Loader2, Timer, ArrowUpDown, XCircle, Undo2, Info,
 } from 'lucide-vue-next';
+import LBadge from '@/components/ds/LBadge.vue';
 
 const props = defineProps({
   isProcessing: { type: Boolean, default: false },
@@ -321,9 +322,9 @@ const handleExecute = () => {
             type="button"
         >
           <span class="arch-summary">{{ selectionSummary }}</span>
-          <span class="badge-ds accent" v-if="!allSelected && !noneSelected">
+          <LBadge variant="accent" v-if="!allSelected && !noneSelected">
             {{ selectedArchitectures.length }}
-          </span>
+          </LBadge>
           <ChevronDown :size="12" class="arch-chevron-icon" :class="{ rotated: dropdownOpen }" />
         </button>
         <Teleport to="body">
@@ -356,7 +357,7 @@ const handleExecute = () => {
 
       <!-- Quick architecture pill preview -->
       <div class="arch-pills-ds" v-if="selectedArchitectures.length > 0 && selectedArchitectures.length <= 10">
-        <span v-for="a in selectedArchitectures" :key="a" class="badge-ds accent">{{ a }}</span>
+        <LBadge v-for="a in selectedArchitectures" :key="a" variant="accent">{{ a }}</LBadge>
       </div>
     </div>
 
@@ -631,21 +632,6 @@ const handleExecute = () => {
 .btn-ds:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.badge-ds {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  font-size: var(--text-caption, 11px);
-  font-weight: var(--weight-semibold);
-}
-
-.badge-ds.accent {
-  background: var(--color-accent-primary-bg);
-  color: var(--color-accent-primary);
-  border: 1px solid rgba(79, 216, 208, 0.25);
 }
 
 .arch-dropdown-ds {
