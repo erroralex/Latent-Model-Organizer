@@ -63,7 +63,12 @@ drop-in-brain-main/
 # =========================
 # Local review / analysis notes
 # =========================
-docs/
+# Ignore the *contents* of docs/, not the directory itself -- git cannot
+# re-include anything inside an excluded directory, so `docs/` would make the
+# negation below silently dead.
+docs/*
+# ...except design specs, which are part of the record
+!docs/superpowers/
 
 # =========================
 # Maven Shade generated POM
