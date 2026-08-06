@@ -6,6 +6,7 @@
  */
 import alxLogoUrl from '../assets/alx_logo.png';
 import { ArrowUpDown, CloudDownload, Settings as SettingsIcon } from 'lucide-vue-next';
+import LSwitch from '@/components/ds/LSwitch.vue';
 
 const props = defineProps({
   activeTab: { type: String, required: true },
@@ -56,18 +57,11 @@ const openDevProfile = () => {
       <div class="sidebar-spacer"></div>
 
       <div class="sidebar-group sidebar-bottom">
-        <label class="toggle-control-ds">
-          <input
-            type="checkbox"
-            :checked="consoleOpen"
-            @change="emit('update:consoleOpen', $event.target.checked)"
-            class="sr-only"
-          />
-          <span class="toggle-track-ds" :class="{ checked: consoleOpen }">
-            <span class="toggle-thumb-ds"></span>
-          </span>
-          <span class="toggle-text">Console</span>
-        </label>
+        <LSwitch
+            :model-value="consoleOpen"
+            label="Console"
+            @update:model-value="v => emit('update:consoleOpen', v)"
+        />
 
         <button
           class="nav-item-ds"
@@ -174,53 +168,6 @@ const openDevProfile = () => {
   transition: color var(--duration-fast);
 }
 
-.toggle-control-ds {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.toggle-track-ds {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: var(--radius-full);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border-default);
-  transition: background var(--duration-fast), border-color var(--duration-fast);
-  flex-shrink: 0;
-}
-
-.toggle-track-ds.checked {
-  background: var(--color-accent-primary);
-  border-color: var(--color-accent-primary);
-}
-
-.toggle-thumb-ds {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-text-secondary);
-  transition: transform var(--duration-fast) var(--ease-standard), background var(--duration-fast);
-}
-
-.toggle-track-ds.checked .toggle-thumb-ds {
-  transform: translateX(16px);
-  background: var(--color-text-on-accent);
-}
-
-.toggle-text {
-  font-size: var(--text-body-sm, 13px);
-  color: var(--color-text-secondary);
-  font-weight: var(--weight-medium);
-}
-
 .dev-credit-link {
   display: flex;
   justify-content: center;
@@ -239,13 +186,5 @@ const openDevProfile = () => {
   height: auto;
   max-height: 44px;
   object-fit: contain;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
 }
 </style>

@@ -11,6 +11,7 @@ import {
   CheckCircle2, Loader2, Timer, ArrowUpDown, XCircle, Undo2, Info,
 } from 'lucide-vue-next';
 import LBadge from '@/components/ds/LBadge.vue';
+import LSwitch from '@/components/ds/LSwitch.vue';
 
 const props = defineProps({
   isProcessing: { type: Boolean, default: false },
@@ -363,18 +364,18 @@ const handleExecute = () => {
 
     <!-- Toggles Row -->
     <div class="options-row-ds">
-      <label class="toggle-control-ds">
-        <input type="checkbox" :checked="isRecursive" @change="emit('update:isRecursive', $event.target.checked)"
-               :disabled="isProcessing" class="sr-only"/>
-        <span class="toggle-track-ds" :class="{ checked: isRecursive }"><span class="toggle-thumb-ds"></span></span>
-        <span class="toggle-label-text">Deep Scan (subfolders)</span>
-      </label>
-      <label class="toggle-control-ds">
-        <input type="checkbox" :checked="isDryRun" @change="emit('update:isDryRun', $event.target.checked)"
-               :disabled="isProcessing" class="sr-only"/>
-        <span class="toggle-track-ds" :class="{ checked: isDryRun }"><span class="toggle-thumb-ds"></span></span>
-        <span class="toggle-label-text">Dry Run (simulate)</span>
-      </label>
+      <LSwitch
+          :model-value="isRecursive"
+          :disabled="isProcessing"
+          label="Deep Scan (subfolders)"
+          @update:model-value="v => emit('update:isRecursive', v)"
+      />
+      <LSwitch
+          :model-value="isDryRun"
+          :disabled="isProcessing"
+          label="Dry Run (simulate)"
+          @update:model-value="v => emit('update:isDryRun', v)"
+      />
     </div>
 
     <!-- Progress Section -->
@@ -759,52 +760,6 @@ const handleExecute = () => {
   padding: 4px 0;
 }
 
-.toggle-control-ds {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.toggle-track-ds {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: var(--radius-full);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border-default);
-  transition: background var(--duration-fast), border-color var(--duration-fast);
-  flex-shrink: 0;
-}
-
-.toggle-track-ds.checked {
-  background: var(--color-accent-primary);
-  border-color: var(--color-accent-primary);
-}
-
-.toggle-thumb-ds {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-text-secondary);
-  transition: transform var(--duration-fast) var(--ease-standard), background var(--duration-fast);
-}
-
-.toggle-track-ds.checked .toggle-thumb-ds {
-  transform: translateX(16px);
-  background: var(--color-text-on-accent);
-}
-
-.toggle-label-text {
-  font-size: var(--text-body-sm, 13px);
-  color: var(--color-text-secondary);
-  font-weight: var(--weight-medium);
-}
-
 .progress-section-ds {
   display: flex;
   flex-direction: column;
@@ -864,13 +819,5 @@ const handleExecute = () => {
 .actions-row-ds, .undo-row-ds {
   display: flex;
   gap: 12px;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
 }
 </style>

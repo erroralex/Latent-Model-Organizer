@@ -7,6 +7,7 @@
 import { ref, onMounted } from 'vue';
 import { Settings as SettingsIcon, Palette, SlidersHorizontal, Heart } from 'lucide-vue-next';
 import LBadge from '@/components/ds/LBadge.vue';
+import LSwitch from '@/components/ds/LSwitch.vue';
 
 const props = defineProps({
   isRecursive: { type: Boolean, required: true },
@@ -79,22 +80,22 @@ onMounted(async () => {
                 <span class="toggle-name-ds">Deep Scan</span>
                 <span class="toggle-desc-ds">Recursively scan all subfolders</span>
               </div>
-              <label class="toggle-control-ds">
-                <input type="checkbox" :checked="isRecursive"
-                       @change="e => emit('update:isRecursive', e.target.checked)" class="sr-only"/>
-                <span class="toggle-track-ds" :class="{ checked: isRecursive }"><span class="toggle-thumb-ds"></span></span>
-              </label>
+              <LSwitch
+                  :model-value="isRecursive"
+                  aria-label="Deep Scan"
+                  @update:model-value="v => emit('update:isRecursive', v)"
+              />
             </div>
             <div class="toggle-row-ds">
               <div class="toggle-info-ds">
                 <span class="toggle-name-ds">Dry Run</span>
                 <span class="toggle-desc-ds">Simulate operations without moving files</span>
               </div>
-              <label class="toggle-control-ds">
-                <input type="checkbox" :checked="isDryRun" @change="e => emit('update:isDryRun', e.target.checked)"
-                       class="sr-only"/>
-                <span class="toggle-track-ds" :class="{ checked: isDryRun }"><span class="toggle-thumb-ds"></span></span>
-              </label>
+              <LSwitch
+                  :model-value="isDryRun"
+                  aria-label="Dry Run"
+                  @update:model-value="v => emit('update:isDryRun', v)"
+              />
             </div>
           </div>
         </section>
@@ -257,43 +258,6 @@ onMounted(async () => {
   color: var(--color-text-tertiary);
 }
 
-.toggle-control-ds {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.toggle-track-ds {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: var(--radius-full);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border-default);
-  transition: background var(--duration-fast), border-color var(--duration-fast);
-}
-
-.toggle-track-ds.checked {
-  background: var(--color-accent-primary);
-  border-color: var(--color-accent-primary);
-}
-
-.toggle-thumb-ds {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-text-secondary);
-  transition: transform var(--duration-fast) var(--ease-standard), background var(--duration-fast);
-}
-
-.toggle-track-ds.checked .toggle-thumb-ds {
-  transform: translateX(16px);
-  background: var(--color-text-on-accent);
-}
-
 .kofi-btn-ds {
   display: inline-flex;
   align-items: center;
@@ -341,13 +305,5 @@ onMounted(async () => {
   font-size: var(--text-caption, 11px);
   color: var(--color-text-tertiary);
   font-family: var(--font-mono);
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
 }
 </style>
