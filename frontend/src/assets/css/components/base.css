@@ -4,12 +4,8 @@
  */
 
 :root {
-    /* Legacy structural names not covered by a design-system token.
-       Colour and status names live in latent/aliases.css. */
+    /* Last legacy structural name still consumed by a component style block. */
     --glass-blur: var(--blur-glass);
-    --border-light: var(--color-border-default);
-    --bg-header: var(--color-surface-overlay);
-    --bg-panel: var(--color-surface-overlay);
 }
 
 /* --- Global Resets --- */
@@ -43,15 +39,6 @@ body {
 
 .spin-icon {
     animation: spin 1s linear infinite;
-}
-
-/* --- Typography Utilities --- */
-.text-gradient {
-    background: var(--grad-text);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-weight: 800;
 }
 
 /* --- Custom Scrollbars --- */

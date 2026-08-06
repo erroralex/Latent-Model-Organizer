@@ -1,14 +1,15 @@
 /**
  * Legacy variable aliases
  *
- * The component stylesheets (buttons/layout/primevue-overrides/base) were written against
- * the pre-Latent "Deep Neon" variable vocabulary, which used to be defined by the
- * themes/*.css files. Those are gone, so every name below would otherwise resolve to
- * nothing and fall back to UA defaults.
+ * primevue-overrides.css and several component <style> blocks were written against the
+ * pre-Latent "Deep Neon" variable vocabulary, which used to be defined by themes/*.css.
+ * Those theme files are gone, so every name below would otherwise resolve to nothing and
+ * fall back to UA defaults.
  *
  * This maps each surviving legacy name onto its Latent Design System token. It is a
  * compatibility shim, not a token file: do not add new names here, and prefer the
- * --color-* / --gradient-* / --glow-* tokens directly in new CSS.
+ * --color-* / --gradient-* / --glow-* tokens directly in new CSS. Every entry has at
+ * least one live consumer -- when the last one goes, delete the alias with it.
  */
 :root {
     /* Accents */
@@ -18,29 +19,18 @@
     /* Surfaces */
     --bg-app: var(--color-bg-canvas);
     --bg-app-image: none;
-    --bg-card: var(--color-surface-1);
     --bg-menu: var(--color-surface-1);
-    --bg-panel-opaque: var(--color-surface-1);
     --bg-input: var(--color-bg-base);
     --bg-btn-inner: var(--color-surface-2);
-    --bg-hover: var(--color-surface-2);
 
-    /* Borders — --border-glass is consumed as a `border:` shorthand, not a colour */
-    --border-glass: 1px solid var(--color-border-default);
+    /* Borders */
     --border-input: var(--color-border-default);
 
     /* Text */
     --text-primary: var(--color-text-primary);
     --text-secondary: var(--color-text-secondary);
-    --text-muted: var(--color-text-tertiary);
 
     /* Gradients & glow */
     --grad-hover: var(--gradient-brand);
-    --grad-text: var(--gradient-brand-text);
     --shadow-glow-primary: var(--glow-primary);
-
-    /* Status colours — these were Tailwind hexes, not Latent ones */
-    --status-success: var(--color-success);
-    --status-warning: var(--color-warning);
-    --status-danger: var(--color-danger);
 }

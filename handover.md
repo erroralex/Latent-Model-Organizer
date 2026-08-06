@@ -169,13 +169,33 @@ Two consequences worth internalising:
   / `--glow-*` tokens directly. The shim exists to keep old stylesheets working, and it
   should shrink over time, not grow.
 
-One asymmetry that will trip you up: `--border-glass` is consumed as a `border:` *shorthand*
-(`primevue-overrides.css`), not as a colour, so it aliases to a full `1px solid var(...)`.
-Mapping it to a colour token silently breaks that rule.
-
 Fallbacks like `var(--sidebar-width, 200px)` are worse than useless once the token is always
 defined: they are unreachable but advertise a value that is not in effect. Several removed
 ones disagreed with the real token (200px vs 224px, Tailwind slate vs Latent borders).
+
+### The global stylesheets were superseded by `-ds` scoped styles, not replaced
+
+The design-system migration re-authored every component against `-ds`-suffixed class names in
+its own `<style scoped>` block, but left the pre-migration global stylesheets in place. The
+result was two parallel vocabularies where only one was ever matched: `.sidebar` vs
+`.sidebar-ds`, `.arch-item` vs `.arch-item-ds`, `.status-bar.is-ok` vs
+`.status-bar-ds.status-ok`. `layout.css` and `buttons.css` turned out to be **100 % dead —
+113 rules, 76 of 81 class tokens never present in the DOM in any state** — and have been
+deleted. `base.css` (resets, scrollbars, body) and `primevue-overrides.css` (PrimeVue's
+runtime `.p-*` classes) are still live.
+
+If you go looking for more dead CSS, two traps make it easy to get wrong:
+
+- **`\b` word boundaries lie here.** `\bsidebar\b` matches inside `sidebar-ds`, so a naive
+  grep reports dead rules as live. Split `class="…"` on whitespace and compare exact tokens.
+- **A rule can look dead only because you never reached its state.** Cross-check the static
+  markup scan against the live DOM (click through every view, modal and dropdown, collecting
+  `classList` tokens), and remember a compound selector like `.toggle-track.checked` is dead
+  if *either* class is absent, even when the other is in use elsewhere.
+
+Before deleting a global rule, check whether the components that use it define it themselves:
+`.sr-only` and `.no-drag` looked shared but every consumer already declared them in its own
+scoped block, so the global copies were redundant rather than load-bearing.
 
 **The design system's `_adherence.oxlintrc.json` does not apply to this app.** Its plugins are
 `react`/`import` and its adherence rules are AST selectors over JS/JSX (`JSXOpeningElement`,
@@ -295,13 +315,17 @@ git log --oneline origin/main..origin/development   # must be empty
   regression cannot be shipped — but that workflow triggers only on `v*` tags, so nothing checks
   ordinary pushes or PRs. A regression stays invisible until someone cuts a release. A small
   push/PR-triggered workflow running `lint:ds` and `mvn test` would close the gap.
-- **15 raw hex colours remain outside the token layer**, reported as warnings by `lint:ds`.
-  Most are opaque black/white in `buttons.css` and `primevue-overrides.css`; one (`#FF5E5B`
-  in `Settingsmodal.vue`) is the Ko-fi brand colour and legitimately is not a Latent token.
-  The warning list is the backlog — promote it to an error once it is empty.
-- **The design-system CSS has never been visually verified since the alias fix.** The variables
-  provably resolve and the build is clean, but nobody has looked at the Sorter and Fetcher
-  screens to confirm the token choices read correctly together.
+- **7 raw hex colours remain outside the token layer**, reported as warnings by `lint:ds`.
+  One (`#FF5E5B` in `Settingsmodal.vue`) is the Ko-fi brand colour and legitimately is not a
+  Latent token, so it needs an exemption rather than a fix. The warning list is the backlog —
+  promote it to an error once it is empty.
+- **Input borders fail WCAG non-text contrast.** Measured in the running app: the input
+  boundary is **1.31:1** against the panel where 1.4.11 requires 3:1, the input *fill* is
+  1.05:1 (it contributes nothing — the border does all the separation), and placeholder text
+  is 4.16:1 against a 4.5:1 AA threshold. This is inherent to the DS border tokens:
+  `--color-border-default` is `rgba(255,255,255,0.10)` and even `--color-border-strong`
+  (0.18) will not reach 3:1 on these surfaces. Fixing it means either an LMO-local override
+  or an upstream token change affecting all three apps — an open decision, not an oversight.
 - **LMO has no `ds/` component layer.** Latent-Library ships 16 design-system Vue primitives;
   LMO has zero and hand-rolls buttons and cards in `buttons.css`. Most visible gap is the
   missing StatusPill: the app polls a local backend over an ephemeral port and shows no
