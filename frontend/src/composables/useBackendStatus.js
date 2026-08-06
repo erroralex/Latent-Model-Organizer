@@ -54,6 +54,7 @@ export function useBackendStatus(apiBase, apiToken, isBackendReady) {
 
   // Nothing to poll until the IPC handshake has produced a port and token.
   watch(isBackendReady, (ready) => {
+    stop();
     if (!ready) return;
     if (!apiToken.value) {
       setStatus('offline');   // fatal engine start, or a plain browser with no electronAPI

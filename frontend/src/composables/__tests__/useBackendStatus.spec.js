@@ -116,4 +116,57 @@ describe('useBackendStatus', () => {
     await vi.advanceTimersByTimeAsync(30000);
     expect(fetchMock.mock.calls.length).toBe(callsBefore);
   });
+
+  it('aborts the in-flight request on unmount', async () => {
+    let capturedSignal;
+    const fetchMock = vi.fn((url, opts) => {
+      capturedSignal = opts.signal;
+      return new Promise(() => {}); // never resolves: unmount happens mid-flight
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const h = harness(apiBase, apiToken, isBackendReady);
+    isBackendReady.value = true;
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(capturedSignal.aborted).toBe(false);
+    h.wrapper.unmount();
+    expect(capturedSignal.aborted).toBe(true);
+  });
+
+  it('goes offline when the request exceeds REQUEST_TIMEOUT_MS', async () => {
+    const fetchMock = vi.fn((url, opts) => new Promise((resolve, reject) => {
+      opts.signal.addEventListener('abort', () => reject(new Error('AbortError')));
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const h = harness(apiBase, apiToken, isBackendReady);
+    isBackendReady.value = true;
+    await nextTick();
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(h.status.value).toBe('offline');
+  });
+
+  it('tears down the previous poll on ready->false and does not double it up on ready->true again', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchMock);
+    const h = harness(apiBase, apiToken, isBackendReady);
+
+    isBackendReady.value = true;
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(0);
+
+    isBackendReady.value = false;
+    await nextTick();
+
+    isBackendReady.value = true;
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(0);
+
+    const callsBefore = fetchMock.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(10000);
+    // If the first watch invocation's interval were never torn down, a
+    // second setInterval would also fire here, doubling this count.
+    expect(fetchMock.mock.calls.length).toBe(callsBefore + 1);
+  });
 });
