@@ -52,8 +52,13 @@ const onChange = (event) => {
   cursor: pointer;
   user-select: none;
   font-family: var(--font-sans);
-  font-size: 13px;
-  color: var(--color-text-primary);
+  position: relative;
+}
+
+.l-switch-label {
+  font-size: var(--text-body-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
 }
 
 /* Visually hidden, still focusable and still announced. */
