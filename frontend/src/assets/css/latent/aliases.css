@@ -38,4 +38,9 @@
     --grad-hover: var(--gradient-brand);
     --grad-text: var(--gradient-brand-text);
     --shadow-glow-primary: var(--glow-primary);
+
+    /* Status colours — these were Tailwind hexes, not Latent ones */
+    --status-success: var(--color-success);
+    --status-warning: var(--color-warning);
+    --status-danger: var(--color-danger);
 }

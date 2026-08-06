@@ -61,6 +61,11 @@ pnpm-debug.log*
 drop-in-brain-main/
 
 # =========================
+# Local review / analysis notes
+# =========================
+docs/
+
+# =========================
 # Maven Shade generated POM
 # =========================
 backend/dependency-reduced-pom.xml

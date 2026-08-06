@@ -145,6 +145,44 @@ in a way that broke rendering.
 bytes in a `.preview.png` name because the Civitai Helper extension names every preview that way.
 Browsers sniff content type, so they render fine. Renaming them buys nothing.
 
+### The CSS has a token layer and a legacy alias shim, and the order matters
+
+`assets/css/latent/` is the vendored Latent Design System: `styles.css` imports the five
+`tokens/*.css` files and then `aliases.css`. Everything under `assets/css/components/` and
+every component `<style>` block is written against those.
+
+`aliases.css` is a compatibility shim, not a token file. The component stylesheets were
+written against the pre-Latent "Deep Neon" vocabulary (`--accent-primary`, `--text-primary`,
+`--bg-input`, …) that used to be defined by `assets/css/themes/*.css`. Those theme files
+stopped being imported during the design-system migration but were not deleted, so **15
+variables across ~135 references resolved to nothing, with no fallback** — text colour,
+button gradients, input borders and switch fills silently fell back to browser defaults.
+The build succeeds either way, which is why it survived a full code review.
+
+Two consequences worth internalising:
+
+- **A missing CSS variable is invisible to every normal check.** Vite does not resolve
+  `var()`, so the build cannot fail on it, and the page still renders — just wrong.
+  `npm run lint:ds` exists specifically for this and exits non-zero on any `var(--x)` with
+  no definition and no fallback.
+- **Do not add names to `aliases.css`.** New CSS should use the `--color-*` / `--gradient-*`
+  / `--glow-*` tokens directly. The shim exists to keep old stylesheets working, and it
+  should shrink over time, not grow.
+
+One asymmetry that will trip you up: `--border-glass` is consumed as a `border:` *shorthand*
+(`primevue-overrides.css`), not as a colour, so it aliases to a full `1px solid var(...)`.
+Mapping it to a colour token silently breaks that rule.
+
+Fallbacks like `var(--sidebar-width, 200px)` are worse than useless once the token is always
+defined: they are unreachable but advertise a value that is not in effect. Several removed
+ones disagreed with the real token (200px vs 224px, Tailwind slate vs Latent borders).
+
+**The design system's `_adherence.oxlintrc.json` does not apply to this app.** Its plugins are
+`react`/`import` and its adherence rules are AST selectors over JS/JSX (`JSXOpeningElement`,
+`Literal[value=/#hex/]`). LMO is Vue with plain CSS and has no JSX, so those selectors match
+nothing here — wiring it in would produce a green lint that proves nothing. `lint:ds` reads
+the `.css` and `.vue` files where the violations actually live instead.
+
 ### Electron: external links need the IPC bridge
 
 `electron/main.js` has an `ipcMain.on('shell:openExternal', ...)` handler but **no
@@ -234,16 +272,21 @@ git log --oneline origin/main..origin/development   # must be empty
 
 - **No frontend tests at all.** `frontend/package.json` has no `vitest` dependency and no `test`
   script, even though a `vitest` skill is installed under `.agents/skills/`. All 86 tests are
-  backend JUnit. Either wire up Vitest or drop the skill so the tooling stops implying coverage
-  that does not exist.
-- **`drop-in-brain-main/` is untracked scaffolding sitting in the repo root.** It is not in
-  `.gitignore`, so it shows up in every status listing. Delete it or ignore it.
-- **`docs/` is untracked** and currently holds an uncommitted `code_review.md`. Decide whether it
-  belongs in the repo or in `.gitignore`; right now it is neither.
-- **`development` is behind `main`.** The release process above starts by bumping the version on
-  `development` and opening a PR into `main`, but `development` is currently 17 commits behind —
-  recent work went straight to `main`. Fast-forward it (`git push origin main:development`) before
-  the next release, or that PR will drag in a stale branch.
+  backend JUnit. `lint:ds` guards one specific CSS failure mode; it is not a test suite. Either
+  wire up Vitest or drop the skill so the tooling stops implying coverage that does not exist.
+- **`lint:ds` is not wired into CI.** `.github/workflows/build.yml` does not run it, so the
+  regression guard only fires if someone runs it by hand. Add it next to the frontend build.
+- **15 raw hex colours remain outside the token layer**, reported as warnings by `lint:ds`.
+  Most are opaque black/white in `buttons.css` and `primevue-overrides.css`; one (`#FF5E5B`
+  in `Settingsmodal.vue`) is the Ko-fi brand colour and legitimately is not a Latent token.
+  The warning list is the backlog — promote it to an error once it is empty.
+- **The design-system CSS has never been visually verified since the alias fix.** The variables
+  provably resolve and the build is clean, but nobody has looked at the Sorter and Fetcher
+  screens to confirm the token choices read correctly together.
+- **LMO has no `ds/` component layer.** Latent-Library ships 16 design-system Vue primitives;
+  LMO has zero and hand-rolls buttons and cards in `buttons.css`. Most visible gap is the
+  missing StatusPill: the app polls a local backend over an ephemeral port and shows no
+  connection state at all.
 - **Windows-only link setup.** `.agents/AGENTS.md` is an NTFS hard link to the root `AGENTS.md`,
   and `.claude/skills` is an NTFS junction to `.agents/skills`. Neither survives a clone on
   another machine or a non-Windows checkout, so a fresh environment needs them recreated before
@@ -259,6 +302,9 @@ cd backend && mvn test
 
 # Backend package
 cd backend && mvn clean package -DskipTests
+
+# Frontend design-system check (fails on undefined CSS variables; warns on raw hexes)
+cd frontend && npm run lint:ds
 
 # Frontend build (outputs to frontend/dist, which electron-builder copies in)
 cd frontend && npm run build

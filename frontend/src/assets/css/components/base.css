@@ -4,17 +4,12 @@
  */
 
 :root {
-    /* Structural Fallbacks (overridden by themes) */
-    --glass-blur: blur(12px);
-    --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.3);
-    --border-light: rgba(255, 255, 255, 0.1);
-    --bg-header: rgba(15, 15, 15, 0.6);
-    --bg-panel: rgba(20, 20, 20, 0.4);
-
-    /* Functional Colors */
-    --status-success: #4ade80;
-    --status-warning: #fbbf24;
-    --status-danger: #f87171;
+    /* Legacy structural names not covered by a design-system token.
+       Colour and status names live in latent/aliases.css. */
+    --glass-blur: var(--blur-glass);
+    --border-light: var(--color-border-default);
+    --bg-header: var(--color-surface-overlay);
+    --bg-panel: var(--color-surface-overlay);
 }
 
 /* --- Global Resets --- */
@@ -29,12 +24,12 @@ body {
     height: 100vh;
     width: 100vw;
     overflow: hidden;
-    background-color: var(--bg-app, #0f0f0f);
-    background-image: var(--bg-app-image, none);
+    background-color: var(--bg-app);
+    background-image: var(--bg-app-image);
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
-    color: var(--text-primary, #ffffff);
+    color: var(--text-primary);
     font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -52,7 +47,7 @@ body {
 
 /* --- Typography Utilities --- */
 .text-gradient {
-    background: var(--grad-text, linear-gradient(90deg, #fff, #ccc));
+    background: var(--grad-text);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

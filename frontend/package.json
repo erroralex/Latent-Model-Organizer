@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint:ds": "node scripts/lint-design-system.mjs"
   },
   "dependencies": {
     "lucide-vue-next": "^1.0.0",
