@@ -58,6 +58,7 @@ const openDevProfile = () => {
 
       <div class="sidebar-group sidebar-bottom">
         <LSwitch
+            class="console-switch"
             :model-value="consoleOpen"
             label="Console"
             @update:model-value="v => emit('update:consoleOpen', v)"
@@ -166,6 +167,11 @@ const openDevProfile = () => {
   font-size: 1.05rem;
   color: inherit;
   transition: color var(--duration-fast);
+}
+
+/* Match .nav-item-ds's padding so "Console" lines up with "Settings" below it. */
+.console-switch {
+  padding: 8px 12px 8px 14px;
 }
 
 .dev-credit-link {

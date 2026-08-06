@@ -28,6 +28,11 @@ describe('LSwitch', () => {
     expect(wrapper.emitted('update:modelValue')).toBeUndefined();
   });
 
+  it('marks the input disabled at the markup level when disabled', () => {
+    const wrapper = mount(LSwitch, { props: { label: 'X', disabled: true } });
+    expect(wrapper.find('input').element.disabled).toBe(true);
+  });
+
   it('associates the label with the input', () => {
     const wrapper = mount(LSwitch, { props: { label: 'Deep Scan' } });
     expect(wrapper.find('label').text()).toBe('Deep Scan');
