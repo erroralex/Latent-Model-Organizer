@@ -95,7 +95,7 @@ const openDevProfile = () => {
 
 <style scoped>
 .sidebar-ds {
-  width: var(--sidebar-width, 200px);
+  width: var(--sidebar-width);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
