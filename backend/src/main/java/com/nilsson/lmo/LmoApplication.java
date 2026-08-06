@@ -430,6 +430,34 @@ public class LmoApplication {
         }
     }
 
+    /**
+     * Reads the build version from {@code version.properties}, which Maven filters at build
+     * time (see {@code <resources>} in {@code pom.xml}).
+     *
+     * <p>This deliberately does not read {@code META-INF/maven/<groupId>/<artifactId>/pom.properties}.
+     * That path encodes the Maven coordinates, and hardcoding them is how this broke before: the
+     * path was built from the Java package name and the jar's {@code finalName}
+     * ({@code com.nilsson.lmo/backend}) instead of the real coordinates
+     * ({@code com.latent/latent-model-organizer-backend}), so it never resolved and every release
+     * reported {@code "dev"}. A filtered resource has no coordinates to get wrong.</p>
+     *
+     * @return the build version, or {@code "dev"} if the resource is missing or unreadable
+     */
+    static String resolveVersion() {
+        try (InputStream input = LmoApplication.class.getResourceAsStream("/version.properties")) {
+            if (input == null) {
+                logger.warn("version.properties not found on classpath, version will be 'dev'");
+                return "dev";
+            }
+            Properties prop = new Properties();
+            prop.load(input);
+            return prop.getProperty("version", "dev");
+        } catch (IOException ex) {
+            logger.error("Failed to read version.properties", ex);
+            return "dev";
+        }
+    }
+
     static class VersionHandler implements HttpHandler {
         private static String version = null;
 
@@ -438,27 +466,11 @@ public class LmoApplication {
             addCorsHeaders(exchange);
             if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 if (version == null) {
-                    version = readVersionFromPom();
+                    version = resolveVersion();
                 }
                 sendJson(exchange, 200, Map.of("version", version));
             } else {
                 sendError(exchange, 405, "Method Not Allowed");
-            }
-        }
-
-        private String readVersionFromPom() {
-            try (InputStream input = LmoApplication.class.getResourceAsStream(
-                    "/META-INF/maven/com.nilsson.lmo/backend/pom.properties")) {
-                if (input == null) {
-                    logger.warn("pom.properties not found, version will be 'dev'");
-                    return "dev";
-                }
-                Properties prop = new Properties();
-                prop.load(input);
-                return prop.getProperty("version", "dev");
-            } catch (IOException ex) {
-                logger.error("Failed to read pom.properties", ex);
-                return "dev";
             }
         }
     }

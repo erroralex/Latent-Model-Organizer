@@ -254,6 +254,23 @@ Flow:
 `gh` CLI is **not installed** on this machine, so PRs must be opened through the GitHub compare
 URL: `https://github.com/erroralex/Latent-Model-Organizer/compare/main...development`.
 
+### The runtime version comes from a filtered resource, not from Maven coordinates
+
+`GET /api/version` reads `version=${project.version}` out of `src/main/resources/version.properties`,
+which Maven filters at build time. The `<resources>` block in `pom.xml` splits filtering so that
+**only** that file is filtered — `logback.xml` must keep its `${...}` patterns intact.
+
+Do not "simplify" this back to reading `META-INF/maven/<groupId>/<artifactId>/pom.properties`.
+That path encodes the Maven coordinates and is exactly how this broke: it was written as
+`com.nilsson.lmo/backend`, mixing the *Java package* with the jar's `finalName`, while the real
+coordinates are `com.latent/latent-model-organizer-backend`. The resource never resolved, the
+handler fell through to its `"dev"` fallback, and the Settings dialog showed "vdev" in every
+released build. The filtered resource has no coordinates to get wrong, which also means it
+survives the groupId unification proposed in the suite audit.
+
+Note the Java package (`com.nilsson.lmo`) and the Maven groupId (`com.latent`) genuinely differ.
+That mismatch is the underlying trap; expect it to bite anything else that assumes they match.
+
 ### Tagging trap
 
 `build.yml` reads the version from the pom **on the tagged commit**. Tagging a `main` that has not
