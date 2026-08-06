@@ -274,6 +274,35 @@ Flow:
 `gh` CLI is **not installed** on this machine, so PRs must be opened through the GitHub compare
 URL: `https://github.com/erroralex/Latent-Model-Organizer/compare/main...development`.
 
+### Every API handler must answer the CORS preflight, or the renderer cannot call it
+
+The renderer is always cross-origin to the backend — `http://localhost:5173` in dev, `file://`
+in production, against `http://127.0.0.1:<ephemeral>`. Any `fetch` carrying an `Authorization`
+header is therefore a non-simple request, and the browser sends an `OPTIONS` preflight first.
+
+So every handler in `LmoApplication` must begin:
+
+```java
+addCorsHeaders(exchange);
+if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+    exchange.sendResponseHeaders(204, -1);
+    return;
+}
+```
+
+`SecurityFilter` deliberately lets `OPTIONS` through without a token so that preflight can
+succeed — that is not a hole, it is what makes the scheme work.
+
+`VersionHandler` was missing this branch and returned 405 to the preflight, so **`/api/version`
+was unreachable from the UI entirely** while working perfectly over curl. That is what made the
+Settings dialog show "vdev" even after the version-resolution fix below, and it made the
+StatusPill report `Offline` against a healthy backend. Both symptoms, one cause.
+
+The trap is that a handler with this bug looks completely healthy from any command-line client,
+because curl sends no preflight. **Verify API changes from the running app, not only with curl.**
+`LmoApplicationHttpTest` now covers the preflight contract for `/api/version`; extend it when
+adding a route.
+
 ### The runtime version comes from a filtered resource, not from Maven coordinates
 
 `GET /api/version` reads `version=${project.version}` out of `src/main/resources/version.properties`,
@@ -307,10 +336,10 @@ git log --oneline origin/main..origin/development   # must be empty
 
 ## Open issues
 
-- **No frontend tests at all.** `frontend/package.json` has no `vitest` dependency and no `test`
-  script, even though a `vitest` skill is installed under `.agents/skills/`. All 86 tests are
-  backend JUnit. `lint:ds` guards one specific CSS failure mode; it is not a test suite. Either
-  wire up Vitest or drop the skill so the tooling stops implying coverage that does not exist.
+- **The backend port is handed to the renderer once, at startup.** If the backend dies and is
+  restarted it comes up on a *new* ephemeral port, but the renderer still holds the old one, so
+  the StatusPill correctly stays `Offline` until the app is restarted. Recovering would need a
+  re-handshake over IPC; nothing does that today.
 - **`lint:ds` only runs at release time.** `build.yml` runs it before the frontend build, so a
   regression cannot be shipped — but that workflow triggers only on `v*` tags, so nothing checks
   ordinary pushes or PRs. A regression stays invisible until someone cuts a release. A small
@@ -326,10 +355,16 @@ git log --oneline origin/main..origin/development   # must be empty
   `--color-border-default` is `rgba(255,255,255,0.10)` and even `--color-border-strong`
   (0.18) will not reach 3:1 on these surfaces. Fixing it means either an LMO-local override
   or an upstream token change affecting all three apps — an open decision, not an oversight.
-- **LMO has no `ds/` component layer.** Latent-Library ships 16 design-system Vue primitives;
-  LMO has zero and hand-rolls buttons and cards in `buttons.css`. Most visible gap is the
-  missing StatusPill: the app polls a local backend over an ephemeral port and shows no
-  connection state at all.
+- **The `ds/` layer is started, not finished.** `components/ds/` now holds `StatusPill`,
+  `LBadge` and `LSwitch`, against Latent-Library's 16. `LButton` is the obvious next one — it
+  needs `full-width` and `icon-only` modifiers Latent-Library lacks and touches 13 call sites
+  across 8 files, which is why it was split out.
+- **Latent-Library has drifted from the design system**; treat the DS contract in
+  `_adherence.oxlintrc.json` as authoritative, not the sibling implementation. Known drift:
+  its `LBadge` substitutes `secondary` for the spec's `outline`; its `LSwitch` is a `<label>`
+  with `@click.prevent` and no `<input>`, so it is not keyboard-reachable; its `StatusPill`
+  initialises to `'online'` before the first health check and never clears its `setInterval`.
+  LMO's ports fix all four deliberately — do not "resync" them to match the sibling.
 - **Windows-only link setup.** `.agents/AGENTS.md` is an NTFS hard link to the root `AGENTS.md`,
   and `.claude/skills` is an NTFS junction to `.agents/skills`. Neither survives a clone on
   another machine or a non-Windows checkout, so a fresh environment needs them recreated before
@@ -340,8 +375,11 @@ git log --oneline origin/main..origin/development   # must be empty
 ## Build, test, run
 
 ```bash
-# Backend tests (86, all JUnit) - use the IntelliJ-bundled mvn, see above
+# Backend tests (91, all JUnit) - use the IntelliJ-bundled mvn, see above
 cd backend && mvn test
+
+# Frontend tests (35, Vitest + @vue/test-utils, jsdom)
+cd frontend && npm run test
 
 # Backend package
 cd backend && mvn clean package -DskipTests
