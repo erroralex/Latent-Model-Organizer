@@ -45,8 +45,8 @@ const statusText = computed(() => {
   border-radius: var(--radius-full);
   border: 1px solid var(--color-border-subtle);
   font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-semibold);
   letter-spacing: 0.02em;
   color: var(--color-text-secondary);
   user-select: none;

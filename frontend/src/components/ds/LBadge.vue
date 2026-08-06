@@ -33,15 +33,16 @@ defineProps({
   gap: 4px;
   border-radius: var(--radius-full);
   font-family: var(--font-sans);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   letter-spacing: 0.02em;
   white-space: nowrap;
   user-select: none;
   border: 1px solid transparent;
 }
 
+/* No 10px token exists in the type scale; left literal. */
 .l-badge.sm { padding: 1px 6px; font-size: 10px; }
-.l-badge.md { padding: 2px 8px; font-size: 11px; }
+.l-badge.md { padding: 2px 8px; font-size: var(--text-caption); }
 
 .l-badge.neutral {
   background: var(--color-surface-2);
