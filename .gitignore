@@ -74,3 +74,8 @@ docs/*
 # Maven Shade generated POM
 # =========================
 backend/dependency-reduced-pom.xml
+
+# =========================
+# Subagent-driven development scratch
+# =========================
+.superpowers/
