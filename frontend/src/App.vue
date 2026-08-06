@@ -14,6 +14,8 @@ import SorterView from './views/SorterView.vue';
 import FetcherView from './views/FetcherView.vue';
 import latentMarkUrl from './assets/latent-mark.svg';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-vue-next';
+import StatusPill from './components/ds/StatusPill.vue';
+import { useBackendStatus } from './composables/useBackendStatus';
 
 useUiZoom();
 
@@ -53,6 +55,8 @@ const isBackendReady    = ref(false);
 
 const apiBase = ref('http://localhost:8080');
 const apiToken = ref('');
+
+const { status: backendStatus } = useBackendStatus(apiBase, apiToken, isBackendReady);
 
 watch(isProcessing, (newValue) => {
   if (!newValue) {
@@ -173,16 +177,14 @@ const initializeBackendConnection = async () => {
         apiBase.value = `http://127.0.0.1:${backend.port}`;
         apiToken.value = backend.token;
 
-        if (backend.port === 8080 && backend.token === null) {
-          statusMessage.value = "❌ FATAL: Java engine failed to start.";
-        } else {
-          console.log(`[LMO] Bound to backend at ${apiBase.value}`);
-        }
+        // Connection state belongs to the StatusPill; the status bar reports
+        // operation outcomes only. A null token surfaces there as "Offline".
+        console.log(`[LMO] Bound to backend at ${apiBase.value}`);
       }
     }
   } catch (e) {
     console.error('[LMO] Failed to retrieve backend port via IPC:', e);
-    statusMessage.value = '❌ Failed to connect to backend.';
+    // Surfaced by the StatusPill, not the status bar.
   } finally {
     isBackendReady.value = true;
   }
@@ -220,6 +222,7 @@ const statusIcon = computed(() => {
       <div class="brand-group-ds no-drag">
         <img :src="latentMarkUrl" alt="Latent" class="brand-mark-img" />
         <span class="app-title-ds">Latent Model Organizer</span>
+        <StatusPill :status="backendStatus" label="Backend" />
       </div>
 
       <div class="titlebar-drag-region"></div>

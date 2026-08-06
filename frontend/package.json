@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint:ds": "node scripts/lint-design-system.mjs"
   },
   "dependencies": {
@@ -17,8 +19,11 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.4",
+    "@vue/test-utils": "^2.4.11",
+    "jsdom": "^25.0.1",
     "vite": "^7.3.1",
-    "vite-plugin-vue-devtools": "^8.0.6"
+    "vite-plugin-vue-devtools": "^8.0.6",
+    "vitest": "^3.2.7"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

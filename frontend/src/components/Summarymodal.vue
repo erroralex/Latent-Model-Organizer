@@ -6,6 +6,7 @@
  */
 import { computed } from 'vue';
 import { Eye, CheckCircle2, BarChart3, Inbox, AlertTriangle, XCircle, X } from 'lucide-vue-next';
+import LBadge from '@/components/ds/LBadge.vue';
 
 const props = defineProps({
   report: { type: Object, required: true },
@@ -35,7 +36,7 @@ const fmtNum = (n) => (n ?? 0).toLocaleString();
           <component :is="isDryRun ? Eye : CheckCircle2" :size="18"
              :style="{ color: isDryRun ? 'var(--color-warning)' : 'var(--color-success)' }" />
           <h2 class="modal-title-ds">{{ title }}</h2>
-          <span v-if="isDryRun" class="badge-ds warning">DRY RUN</span>
+          <LBadge v-if="isDryRun" variant="warning">DRY RUN</LBadge>
         </div>
         <button class="win-btn-ds" @click="emit('close')" title="Close">
           <span>✕</span>
@@ -298,15 +299,6 @@ const fmtNum = (n) => (n ?? 0).toLocaleString();
   padding: 12px 20px;
   border-top: 1px solid var(--color-border-subtle);
   background: var(--color-surface-2);
-}
-
-.badge-ds.warning {
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-  border: 1px solid rgba(245, 184, 78, 0.3);
-  font-size: var(--text-caption, 11px);
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
 }
 
 .btn-ds {

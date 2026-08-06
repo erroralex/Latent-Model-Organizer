@@ -7,6 +7,8 @@
 import { ref, watch } from 'vue';
 import InfoModal from '../components/InfoModal.vue';
 import { HelpCircle, FolderOpen, Info, CloudDownload, XCircle, Tags, Loader2 } from 'lucide-vue-next';
+import LBadge from '@/components/ds/LBadge.vue';
+import LSwitch from '@/components/ds/LSwitch.vue';
 
 const props = defineProps({
   isProcessing: { type: Boolean, default: false },
@@ -75,16 +77,18 @@ const handleBackfill = () => {
 
     <!-- Toggles Row -->
     <div class="options-row-ds">
-      <label class="toggle-control-ds">
-        <input type="checkbox" :checked="isRecursive" @change="emit('update:isRecursive', $event.target.checked)" :disabled="isProcessing" class="sr-only" />
-        <span class="toggle-track-ds" :class="{ checked: isRecursive }"><span class="toggle-thumb-ds"></span></span>
-        <span class="toggle-label-text">Deep Scan (subfolders)</span>
-      </label>
-      <label class="toggle-control-ds">
-        <input type="checkbox" :checked="isDryRun" @change="emit('update:isDryRun', $event.target.checked)" :disabled="isProcessing" class="sr-only" />
-        <span class="toggle-track-ds" :class="{ checked: isDryRun }"><span class="toggle-thumb-ds"></span></span>
-        <span class="toggle-label-text">Dry Run (simulate)</span>
-      </label>
+      <LSwitch
+          :model-value="isRecursive"
+          :disabled="isProcessing"
+          label="Deep Scan (subfolders)"
+          @update:model-value="v => emit('update:isRecursive', v)"
+      />
+      <LSwitch
+          :model-value="isDryRun"
+          :disabled="isProcessing"
+          label="Dry Run (simulate)"
+          @update:model-value="v => emit('update:isDryRun', v)"
+      />
     </div>
 
     <!-- Main Actions -->
@@ -108,7 +112,7 @@ const handleBackfill = () => {
     <div class="card-group-ds backfill-section-ds">
       <div class="card-header-ds">
         <span class="card-title-ds">Trigger Words &amp; Descriptions</span>
-        <span class="badge-ds outline">Offline</span>
+        <LBadge variant="outline">Offline</LBadge>
       </div>
       <p class="card-helper-ds">
         Forge and A1111 read <code>&lt;model&gt;.json</code> rather than <code>.civitai.info</code>.
@@ -302,21 +306,6 @@ const handleBackfill = () => {
   cursor: not-allowed;
 }
 
-.badge-ds {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  font-size: var(--text-caption, 11px);
-  font-weight: var(--weight-semibold);
-}
-
-.badge-ds.outline {
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border-strong);
-}
-
 .info-banner-ds {
   display: flex;
   gap: 12px;
@@ -346,52 +335,6 @@ const handleBackfill = () => {
   padding: 4px 0;
 }
 
-.toggle-control-ds {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.toggle-track-ds {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: var(--radius-full);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border-default);
-  transition: background var(--duration-fast), border-color var(--duration-fast);
-  flex-shrink: 0;
-}
-
-.toggle-track-ds.checked {
-  background: var(--color-accent-primary);
-  border-color: var(--color-accent-primary);
-}
-
-.toggle-thumb-ds {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-text-secondary);
-  transition: transform var(--duration-fast) var(--ease-standard), background var(--duration-fast);
-}
-
-.toggle-track-ds.checked .toggle-thumb-ds {
-  transform: translateX(16px);
-  background: var(--color-text-on-accent);
-}
-
-.toggle-label-text {
-  font-size: var(--text-body-sm, 13px);
-  color: var(--color-text-secondary);
-  font-weight: var(--weight-medium);
-}
-
 .actions-row-ds {
   display: flex;
   gap: 12px;
@@ -399,13 +342,5 @@ const handleBackfill = () => {
 
 .backfill-section-ds {
   margin-top: 8px;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
 }
 </style>
