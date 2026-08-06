@@ -274,8 +274,10 @@ git log --oneline origin/main..origin/development   # must be empty
   script, even though a `vitest` skill is installed under `.agents/skills/`. All 86 tests are
   backend JUnit. `lint:ds` guards one specific CSS failure mode; it is not a test suite. Either
   wire up Vitest or drop the skill so the tooling stops implying coverage that does not exist.
-- **`lint:ds` is not wired into CI.** `.github/workflows/build.yml` does not run it, so the
-  regression guard only fires if someone runs it by hand. Add it next to the frontend build.
+- **`lint:ds` only runs at release time.** `build.yml` runs it before the frontend build, so a
+  regression cannot be shipped — but that workflow triggers only on `v*` tags, so nothing checks
+  ordinary pushes or PRs. A regression stays invisible until someone cuts a release. A small
+  push/PR-triggered workflow running `lint:ds` and `mvn test` would close the gap.
 - **15 raw hex colours remain outside the token layer**, reported as warnings by `lint:ds`.
   Most are opaque black/white in `buttons.css` and `primevue-overrides.css`; one (`#FF5E5B`
   in `Settingsmodal.vue`) is the Ko-fi brand colour and legitimately is not a Latent token.

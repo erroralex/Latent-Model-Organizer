@@ -54,6 +54,12 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
+      # Vite never resolves var(), so a missing CSS variable builds cleanly and
+      # renders wrong. Check before the build rather than shipping it.
+      - name: Check Design System Adherence
+        working-directory: ./frontend
+        run: npm run lint:ds
+
       - name: Build Frontend (Vue)
         working-directory: ./frontend
         run: npm run build
