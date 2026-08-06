@@ -105,7 +105,7 @@ onUnmounted(() => {
       <div class="console-left-ds">
         <Terminal :size="14" class="console-terminal-icon" />
         <span class="console-title-ds">Backend Logs</span>
-        <LBadge variant="outline" v-if="logs.length > 0">{{ logs.length }}</LBadge>
+        <LBadge variant="outline" size="sm" v-if="logs.length > 0">{{ logs.length }}</LBadge>
       </div>
       <div class="console-right-ds">
         <button
