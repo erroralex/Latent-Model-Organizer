@@ -128,7 +128,7 @@ public class LmoApplication {
         }
     }
 
-    private static void createSecureContext(HttpServer server, String path, HttpHandler handler, SecurityFilter securityFilter) {
+    static void createSecureContext(HttpServer server, String path, HttpHandler handler, SecurityFilter securityFilter) {
         server.createContext(path, handler).getFilters().add(securityFilter);
     }
 
@@ -464,6 +464,10 @@ public class LmoApplication {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             addCorsHeaders(exchange);
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
             if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
                 if (version == null) {
                     version = resolveVersion();
