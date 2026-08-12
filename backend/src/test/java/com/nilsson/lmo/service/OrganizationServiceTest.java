@@ -150,6 +150,29 @@ class OrganizationServiceTest {
         assertFalse(Files.exists(organizedPath));
     }
 
+    /**
+     * When organizing in place (source == target), a prior run's {@code undo-manifest.json}
+     * sits in the same directory being scanned. It must never be treated as a candidate model
+     * file, or it gets sorted into {@code Uncategorized} and the undo trail is destroyed.
+     */
+    @Test
+    void organizeModels_shouldNotSortTheUndoManifestItself() throws IOException {
+        Path modelFile = sourceDir.resolve("test_model.safetensors");
+        Files.writeString(modelFile, "dummy model data");
+        Files.writeString(sourceDir.resolve(OrganizationService.UNDO_MANIFEST_FILENAME), "{}");
+
+        when(modelAnalyzer.analyze(any(Path.class)))
+                .thenReturn(new ModelMetadata("test_model.safetensors", "SDXL 1.0", "SDXL Base"));
+
+        OperationReport report = organizationService.organizeModels(
+                sourceDir, sourceDir, Collections.emptyList(), false, false);
+
+        assertNull(report.summary().get("Uncategorized"));
+        assertFalse(Files.exists(sourceDir.resolve("Uncategorized")
+                .resolve(OrganizationService.UNDO_MANIFEST_FILENAME)));
+        assertTrue(Files.exists(sourceDir.resolve(OrganizationService.UNDO_MANIFEST_FILENAME)));
+    }
+
     @Test
     void organizeModels_shouldRespectAllowedArchitectures() throws IOException {
         Files.writeString(sourceDir.resolve("sdxl.safetensors"), "sdxl data");

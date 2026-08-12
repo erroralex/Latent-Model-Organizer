@@ -127,6 +127,19 @@ to text — otherwise every card renders literal `<p>` tags.
 has a sidecar, which on a mature library is nearly all of them. The backfill is offline, does no
 hashing or network calls, and is idempotent — safe to re-run.
 
+### The undo manifest must never scan itself
+
+When source and target directories coincide (organizing in place), `undo-manifest.json` from a
+prior run sits right inside the directory being scanned. Before the fix, the candidate-file filter
+in `OrganizationService.organizeModels` had no opinion on it, so `ModelAnalyzer` classified the
+manifest itself as `Uncategorized` and moved it to `Uncategorized\undo-manifest (3).json` —
+destroying the very undo trail a subsequent `/api/undo` depends on, and silently corrupting
+history on every in-place sort thereafter.
+
+`isUndoManifest()` filters `UNDO_MANIFEST_FILENAME` out of the scan alongside the existing
+`isAlreadyOrganized()` check. Regression test:
+`OrganizationServiceTest#organizeModels_shouldNotSortTheUndoManifestItself`.
+
 ### Preview extensions come from the URL, never from `images[0].type`
 
 `type` describes what the **author uploaded**; the URL describes what the **CDN will return**, and

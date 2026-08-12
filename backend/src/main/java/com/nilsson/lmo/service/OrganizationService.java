@@ -103,6 +103,7 @@ public class OrganizationService {
                     .filter(p -> !isCancelled.get()) // Short-circuit scan
                     .filter(Files::isRegularFile)
                     .filter(p -> !isAlreadyOrganized(p, targetDir))
+                    .filter(p -> !isUndoManifest(p))
                     .toList();
 
             if (isCancelled.get()) {
@@ -648,6 +649,16 @@ public class OrganizationService {
         Path expectedParent = targetDir.resolve(architecture.trim()).toAbsolutePath().normalize();
         Path actualParent = file.toAbsolutePath().normalize().getParent();
         return expectedParent.equals(actualParent);
+    }
+
+    /**
+     * The undo manifest is tool-generated bookkeeping, not a model to classify. When source and
+     * target directories coincide (organizing in place), a previous run's {@code undo-manifest.json}
+     * sits right in the scan and would otherwise be treated as a candidate file and sorted into
+     * {@code Uncategorized} — corrupting the very manifest a subsequent undo depends on.
+     */
+    private static boolean isUndoManifest(Path file) {
+        return UNDO_MANIFEST_FILENAME.equals(file.getFileName().toString());
     }
 
     private static boolean isAlreadyOrganized(Path file, Path targetDir) {
