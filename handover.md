@@ -32,7 +32,7 @@ and Logback; tests add JUnit 5, Mockito and ArchUnit. Do not reach for Spring id
 (`@RestController`, `@Service`, dependency injection) — nothing will wire them up. `AGENTS.md`
 states this correctly and is worth trusting.
 
-Backend version `1.2.0` (`backend/pom.xml` — the single source of truth, see Releases).
+Backend version `1.3.0` (`backend/pom.xml` — the single source of truth, see Releases).
 
 ### Repository map
 
@@ -273,7 +273,7 @@ Version lives in **`backend/pom.xml` only**. `.github/workflows/build.yml` reads
 `frontend/package.json` at build time with `npm version --no-git-tag-version`.
 
 **The committed versions in those two `package.json` files are therefore stale by design**
-(`electron/package.json` currently reads `1.0.0` against a pom of `1.2.0`). Do not hand-edit them
+(`electron/package.json` currently reads `1.0.0` against a pom of `1.3.0`). Do not hand-edit them
 to "fix" the mismatch.
 
 Flow:

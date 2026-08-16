@@ -6,10 +6,10 @@
 
 ![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Vue.js](https://img.shields.io/badge/Vue.js-3-4FC08D?style=for-the-badge&logo=vue.js&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-5-646CFF?style=for-the-badge&logo=vite&logoColor=white)
-![Electron](https://img.shields.io/badge/Electron-31-47848F?style=for-the-badge&logo=electron&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-7-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Electron](https://img.shields.io/badge/Electron-28-47848F?style=for-the-badge&logo=electron&logoColor=white)
 
-A high-performance, ultra-low-memory desktop utility designed to wrangle massive AI model libraries. It organizes Checkpoints, LoRAs, and embeddings by architecture (SDXL, Pony, Flux, SD 1.5, etc.) using **zero-copy `.safetensors` header parsing** and an **automated Civitai metadata fetcher**—all wrapped in a premium, multi-themed glassmorphism interface.
+A high-performance, ultra-low-memory desktop utility designed to wrangle massive AI model libraries. It organizes Checkpoints, LoRAs, and embeddings by architecture (SDXL, Pony, Flux, SD 1.5, etc.) using **zero-copy `.safetensors` header parsing** and an **automated Civitai metadata fetcher**—all wrapped in a premium glassmorphism interface built on the shared Latent Design System.
 
 ---
 
@@ -109,7 +109,9 @@ Latent Model Organizer bypasses heavy frameworks to deliver raw native performan
 
 * **Frontend (Vue 3 + Vite):**
   * **Composition API:** Highly reactive state management for UI toggles and API payloads.
-  * **Dynamic Theme Engine:** Hot-swappable CSS custom properties injected at runtime.
+  * **Latent Design System:** Shared token layer (colors, spacing, typography) and `ds/`
+    component primitives (`StatusPill`, `LBadge`, `LSwitch`) kept in sync with the sister
+    Latent apps.
   * **Glassmorphism CSS:** Centralized, premium design system utilizing `backdrop-filter`.
 
 * **Desktop (Electron):**
