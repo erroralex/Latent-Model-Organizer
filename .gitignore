@@ -54,7 +54,12 @@ pnpm-debug.log*
 # Agent instructions / skills (local tooling, not part of the repo)
 # =========================
 .agents/
-.claude/
+# Ignore the *contents* of .claude/, not the directory itself -- git cannot
+# re-include anything inside an excluded directory, so `.claude/` would make
+# the negation below silently dead.
+.claude/*
+# ...except shared project settings, which are part of the record
+!.claude/settings.json
 
 # =========================
 # Temporary Drop-in Brain Kit
