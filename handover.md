@@ -378,10 +378,13 @@ git log --oneline origin/main..origin/development   # must be empty
   with `@click.prevent` and no `<input>`, so it is not keyboard-reachable; its `StatusPill`
   initialises to `'online'` before the first health check and never clears its `setInterval`.
   LMO's ports fix all four deliberately — do not "resync" them to match the sibling.
-- **Windows-only link setup.** `.agents/AGENTS.md` is an NTFS hard link to the root `AGENTS.md`,
-  and `.claude/skills` is an NTFS junction to `.agents/skills`. Neither survives a clone on
-  another machine or a non-Windows checkout, so a fresh environment needs them recreated before
-  assistant instructions and skills resolve.
+- **`.agents/AGENTS.md` is not actually linked to the root `AGENTS.md`.** `fsutil hardlink list`
+  shows each file lists only itself — they are independent copies that happen to match today,
+  with nothing keeping them in sync. Edit both, or replace `.agents/AGENTS.md` with a real hard
+  link (`fsutil hardlink create`), or point it at the root file another way.
+- **`.claude/skills` is an NTFS junction to `.agents/skills`.** This one is a real link and does
+  not survive a clone on another machine or a non-Windows checkout, so a fresh environment needs
+  it recreated before skills resolve.
 
 ---
 
