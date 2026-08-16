@@ -378,13 +378,23 @@ git log --oneline origin/main..origin/development   # must be empty
   with `@click.prevent` and no `<input>`, so it is not keyboard-reachable; its `StatusPill`
   initialises to `'online'` before the first health check and never clears its `setInterval`.
   LMO's ports fix all four deliberately — do not "resync" them to match the sibling.
+- **`.agents/`, `.claude/` (except `settings.json`), and `docs/superpowers/` are gitignored and
+  untracked.** They are local assistant tooling, not part of the shipped project, so a fresh
+  clone will not have them — `.agents/AGENTS.md`, the skills under `.agents/skills/`, and
+  `.claude/skills` (an NTFS junction to `.agents/skills`) all need to be recreated locally before
+  assistant instructions and skills resolve. `.claude/settings.json` is the one file under
+  `.claude/` still tracked, via a `.claude/*` + `!.claude/settings.json` pair in `.gitignore` —
+  the same "ignore contents, not the directory" pattern used for `docs/*`.
 - **`.agents/AGENTS.md` is not actually linked to the root `AGENTS.md`.** `fsutil hardlink list`
   shows each file lists only itself — they are independent copies that happen to match today,
-  with nothing keeping them in sync. Edit both, or replace `.agents/AGENTS.md` with a real hard
-  link (`fsutil hardlink create`), or point it at the root file another way.
-- **`.claude/skills` is an NTFS junction to `.agents/skills`.** This one is a real link and does
-  not survive a clone on another machine or a non-Windows checkout, so a fresh environment needs
-  it recreated before skills resolve.
+  with nothing keeping them in sync. Now that `.agents/` is untracked this only matters locally,
+  but it's still worth knowing before editing one and assuming the other picked it up.
+- **Trap: `git rm --cached` followed by a branch switch in the same sequence can delete an
+  untracked file outright**, not just drop it from the index. Untracking `.claude/settings.json`
+  this way and then running `git checkout development && git merge --ff-only` in the same breath
+  deleted it from disk; it had to be recovered with `git show <prior-commit>:.claude/settings.json`.
+  Recheck files on disk after any `rm --cached` + checkout combo, don't assume `--cached` alone
+  guarantees the working tree is untouched.
 
 ---
 
