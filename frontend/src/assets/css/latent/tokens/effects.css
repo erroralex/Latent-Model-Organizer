@@ -14,8 +14,3 @@
 --duration-slow:280ms;
 }
 @keyframes ds-pulse{0%,100%{opacity:.5}50%{opacity:1}}
-.dropzone-hint {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-  margin-top: -2px;
-}
