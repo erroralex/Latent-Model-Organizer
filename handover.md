@@ -216,6 +216,15 @@ scoped block, so the global copies were redundant rather than load-bearing.
 nothing here — wiring it in would produce a green lint that proves nothing. `lint:ds` reads
 the `.css` and `.vue` files where the violations actually live instead.
 
+### Brand mark lives in three separate places, not one
+
+`electron/splash.html` has its own inline `<svg>` copy of the brand mark, entirely separate from
+`frontend/src/assets/latent-mark.svg` (titlebar) and `frontend/src/assets/lmo_icon.png` (app/build
+icon) — and `frontend/public/favicon.ico` is a fourth file again, independently generated for the
+web-tab icon and never derived from `lmo_icon.png`. A brand-mark update has to touch all four, or
+the splash screen and the dev-mode browser tab keep showing the old mark after the titlebar and
+installer icon are already updated.
+
 ### Electron: external links need the IPC bridge
 
 `electron/main.js` has an `ipcMain.on('shell:openExternal', ...)` handler but **no
