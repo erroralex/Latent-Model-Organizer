@@ -154,7 +154,6 @@ Latent Model Organizer automatically remembers your selected directories, chosen
 
 ## 📜 License
 
-
 Distributed under the **MIT License with the Commons Clause**. Free to use, modify, and share. The Commons Clause restricts *selling* the Software or offering it as a paid hosted/consulting service. See [LICENSE](LICENSE) for the full text.
 
 ---
